@@ -1,0 +1,8 @@
+node_modules/
+dist/
+app/vendor/
+test/shots/
+build/cert/
+shell/obj/
+build/shellmenu/*.msix
+test/_sl/

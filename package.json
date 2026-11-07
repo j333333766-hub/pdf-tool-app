@@ -1,0 +1,98 @@
+{
+  "name": "pdf-tool",
+  "productName": "PDF 도구",
+  "version": "1.5.0",
+  "description": "PDF 합치기·나누기·서명·쪽 편집·글자·그림 편집·용량 줄이기·그림 변환, 한글 문서 변환",
+  "main": "app/main.js",
+  "author": "j333333766",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "vendor": "node tools/copy-vendor.mjs",
+    "test": "node test/run-tests.mjs",
+    "dist": "npm run vendor && node tools/build-shellmenu.mjs && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "mupdf": "^1.28.1",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "^4.10.38",
+    "playwright-core": "^1.64.1"
+  },
+  "build": {
+    "appId": "kr.j333333766.pdftool",
+    "productName": "PDF 도구",
+    "executableName": "PdfTool",
+    "copyright": "© 2026 j333333766",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**/*",
+      "package.json",
+      "LICENSE",
+      "!**/node_modules/mupdf/dist/*.br"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "PdfTool-Setup-${version}.${ext}",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PDF 도구",
+      "uninstallDisplayName": "PDF 도구",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "include": "build/installer.nsh",
+      "installerLanguages": [
+        "ko_KR"
+      ],
+      "language": "1042"
+    },
+    "extraResources": [
+      {
+        "from": "build/hwp",
+        "to": "hwp",
+        "filter": [
+          "hwp2pdf.ps1",
+          "FilePathCheckerModule.dll"
+        ]
+      },
+      {
+        "from": "build/shellmenu",
+        "to": "shellmenu",
+        "filter": [
+          "AppxManifest.xml",
+          "PdfToolShell.dll",
+          "PdfToolShellMenu.msix",
+          "pdftool-shellmenu.cer",
+          "Assets/**"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/mupdf/**"
+    ]
+  }
+}

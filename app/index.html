@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; script-src 'self'">
+<title>PDF 도구</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">PDF 도구</div>
+  <span class="spacer"></span>
+  <button id="btnSettings" class="ghost" title="설정">설정</button>
+</header>
+<div class="body">
+<nav class="side">
+  <div class="group">합치기 · 나누기</div>
+  <button class="tab active" data-tab="merge">합치기</button>
+  <button class="tab" data-tab="split">나누기</button>
+  <button class="tab" data-tab="essay">평가지 학생별 분할</button>
+  <div class="group">쪽 편집</div>
+  <button class="tab" data-tab="organize">쪽 정리</button>
+  <button class="tab" data-tab="rotate">쪽 회전</button>
+  <button class="tab" data-tab="unspread">두 쪽 → 한 쪽씩</button>
+  <button class="tab" data-tab="crop">영역 자르기</button>
+  <div class="group">넣기 · 바꾸기</div>
+  <button class="tab" data-tab="edit">글자 · 그림 편집</button>
+  <button class="tab" data-tab="sign">서명 넣기</button>
+  <button class="tab" data-tab="stamp">쪽번호 · 워터마크</button>
+  <button class="tab" data-tab="compress">용량 줄이기</button>
+  <button class="tab" data-tab="toimage">PDF → 그림</button>
+  <button class="tab" data-tab="hwp">한글 변환</button>
+</nav>
+
+<!-- 합치기 -->
+<section id="tab-merge" class="panel active">
+  <div class="toolbar">
+    <button id="mAdd" class="primary">파일 추가</button>
+    <button id="mSort">이름순 정렬</button>
+    <button id="mClear">모두 빼기</button>
+    <span class="spacer"></span>
+    <label class="muted small" title="그림 파일을 넣을 때의 쪽 크기">그림 쪽 크기
+      <select id="mFit"><option value="a4">A4에 맞추기</option><option value="orig">그림 크기 그대로</option></select></label>
+    <span id="mSummary" class="muted"></span>
+    <button id="mRun" class="primary big" disabled>합치기</button>
+  </div>
+  <div id="mDrop" class="drop">
+    <ol id="mList" class="filelist"></ol>
+    <div class="empty" id="mEmpty">
+      <p class="big-text">PDF 파일을 여기에 끌어다 놓으세요</p>
+      <p class="muted">그림(PNG·JPG·GIF·WebP·BMP)은 한 장이 한 쪽이 되고, 한글 문서(hwp, hwpx)는 PDF로 바꿔서 넣습니다.</p>
+      <p class="muted">파일 탐색기에서 여러 PDF를 고른 뒤 오른쪽 클릭 → <b>PDF 합치기</b>로도 열 수 있습니다.<br>
+      (윈도우 11은 오른쪽 클릭 후 <b>추가 옵션 표시</b> 안에 있습니다)</p>
+    </div>
+  </div>
+  <p class="hint">줄을 끌어서 순서를 바꿉니다. '쪽' 칸을 비워 두면 전체, <code>1-3, 5</code>처럼 쓰면 그 쪽만 넣습니다.</p>
+</section>
+
+<!-- 나누기 -->
+<section id="tab-split" class="panel">
+  <div class="toolbar">
+    <button id="sOpen" class="primary">PDF 열기</button>
+    <span id="sName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="sRun" class="primary big" disabled>나누기</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>나누는 방법</h3>
+      <label><input type="radio" name="sMode" value="each" checked> 한 쪽씩 따로</label>
+      <label><input type="radio" name="sMode" value="every"> <input id="sEvery" type="number" min="1" value="2" class="num"> 쪽씩 묶어서</label>
+      <label><input type="radio" name="sMode" value="ranges"> 범위대로</label>
+      <input id="sRanges" type="text" placeholder="예: 1-3, 4-6, 7-" class="wide">
+      <p class="muted small">쉼표 하나가 파일 하나입니다.</p>
+      <label><input type="radio" name="sMode" value="named"> 범위 · 파일 이름 표로</label>
+      <div id="sNamed" class="named hidden">
+        <table class="sheet"><thead><tr><th>쪽 범위</th><th>파일 이름</th><th></th></tr></thead><tbody id="sNamedRows"></tbody></table>
+        <button id="sNamedAdd" class="small-btn">＋ 줄 추가</button>
+        <p class="muted small">엑셀에서 [쪽 범위][파일 이름] 두 칸을 복사해 표에 붙여 넣을 수 있습니다.</p>
+      </div>
+      <label><input type="radio" name="sMode" value="picked"> 고른 쪽만 한 파일로</label>
+      <p class="muted small">오른쪽 미리보기에서 쪽을 눌러 고릅니다. <span id="sPickedInfo"></span></p>
+      <div class="pick-buttons"><button id="sPickAll">모두 고르기</button><button id="sPickNone">고르기 취소</button></div>
+      <h3>저장할 곳</h3>
+      <div id="sDir" class="muted small">원본과 같은 폴더</div>
+      <button id="sDirBtn">폴더 바꾸기</button>
+      <p id="sPreview" class="preview-note"></p>
+    </aside>
+    <div id="sDrop" class="drop thumbs-wrap">
+      <div id="sThumbs" class="thumbs"></div>
+      <div class="empty" id="sEmpty"><p class="big-text">나눌 PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 서명 넣기 -->
+<section id="tab-sign" class="panel">
+  <div class="toolbar">
+    <button id="gOpen" class="primary">PDF 열기</button>
+    <span id="gName" class="filename"></span>
+    <span class="spacer"></span>
+    <span id="gCount" class="muted"></span>
+    <button id="gRun" class="primary big" disabled>서명한 PDF 저장</button>
+  </div>
+  <div class="sign-body">
+    <aside class="options">
+      <h3>내 서명</h3>
+      <div id="gSigs" class="sigs"></div>
+      <button id="gDraw" class="primary">새 서명 그리기</button>
+      <button id="gImage">그림 파일로 추가</button>
+      <p class="muted small">서명을 고른 뒤 문서를 누르면 그 자리에 들어갑니다. 넣은 서명은 끌어서 옮기고, 오른쪽 아래 모서리로 크기를 바꿉니다.</p>
+      <label class="small"><input type="checkbox" id="gWhite" checked> 그림 파일의 흰 배경 지우기</label>
+    </aside>
+    <div id="gDrop" class="drop pages-wrap">
+      <div id="gPages" class="pages"></div>
+      <div class="empty" id="gEmpty"><p class="big-text">서명할 PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- 글자 · 그림 편집 -->
+<section id="tab-edit" class="panel">
+  <div class="toolbar">
+    <button id="dOpen" class="primary">PDF 열기</button>
+    <span id="dName" class="filename"></span>
+    <div class="seg" id="dModes">
+      <button data-m="select" class="on" title="글자 줄이나 그림을 눌러 고칩니다">고치기</button>
+      <button data-m="text" title="누른 자리에 새 글자를 넣습니다">글상자</button>
+      <button data-m="image" title="누른 자리에 그림 파일을 넣습니다">그림 넣기</button>
+      <button data-m="erase" title="끌어서 고른 부분을 지웁니다">영역 지우기</button>
+    </div>
+    <button id="dUndo" disabled title="Ctrl+Z">↶ 되돌리기</button>
+    <span class="spacer"></span>
+    <button id="dRun" class="primary big" disabled>저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>글자 모양</h3>
+      <label>글꼴 <select id="dFont"><option value="auto">원래와 비슷하게</option></select></label>
+      <label>크기 <input id="dSize" type="number" min="4" max="200" step="0.5" value="12" class="num"> pt</label>
+      <label>색 <input id="dColor" type="color" value="#000000"></label>
+      <label><input type="checkbox" id="dBold"> 굵게</label>
+      <p class="muted small">줄을 고칠 때는 그 줄의 크기·색을 가져옵니다. 바꾼 뒤 적용하면 그 모양으로 씁니다.</p>
+      <h3>쓰는 법</h3>
+      <p id="dHelp" class="muted small"></p>
+      <p id="dNote" class="preview-note"></p>
+    </aside>
+    <div id="dDrop" class="drop stage-wrap">
+      <div class="pv-nav"><button id="dPrev">◀ 이전</button><span id="dPno"></span><button id="dNext">다음 ▶</button>
+        <select id="dZoom"><option value="fit">쪽 맞춤</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></div>
+      <div class="stage"><div class="stage-inner" id="dInner"><img id="dImg" alt=""><div id="dLayer" class="edit-layer"></div></div></div>
+      <div class="empty" id="dEmpty"><p class="big-text">편집할 PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p>
+        <p class="muted">글자 줄을 눌러 고치고, 그림을 옮기거나 바꾸고, 필요 없는 부분을 지웁니다.</p></div>
+    </div>
+  </div>
+  <p class="hint">고친 글자는 원래 글자를 실제로 지우고 같은 자리에 새로 씁니다(글꼴은 맑은 고딕·함초롬체로 바뀔 수 있고, 줄이 길어져도 다음 줄로 넘어가지 않습니다). 저장 전까지 원본 파일은 그대로입니다.</p>
+</section>
+
+<!-- 평가지 학생별 분할 -->
+<section id="tab-essay" class="panel">
+  <div class="toolbar">
+    <button id="eOpen" class="primary">PDF 열기</button>
+    <span id="eName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="eRun" class="primary big" disabled>학생별로 나눠 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options wide-opt">
+      <h3>학교 명렬표</h3>
+      <p id="eRosterInfo" class="muted small"></p>
+      <div class="pick-buttons"><button id="eRosterLoad">명렬표 올리기(.xlsx)</button><button id="eSample">샘플 받기</button></div>
+      <button id="eRosterClear" class="small-btn">명렬표 지우기</button>
+      <p class="muted small">첫 행에 <b>학년 / 반 / 번호 / 이름</b>, 2행부터 학생. 여러 학급을 한 시트에 넣어도 됩니다. 올린 명렬표는 이 컴퓨터에 보관됩니다.</p>
+      <h3>명단</h3>
+      <label>방식 <select id="eMode"><option value="roster">명렬표 / 학번·이름</option><option value="manual">파일 이름 직접 입력</option></select></label>
+      <div class="row2"><label>학년 <select id="eGrade"></select></label><label>반 <select id="eClass"></select></label></div>
+      <label>1명당 쪽 수 <input id="ePps" type="number" min="1" value="2" class="num"></label>
+      <div class="pick-buttons"><button id="eReset">학급 다시 불러오기</button><button id="eAddRow">＋ 추가 응시자</button></div>
+      <button id="eClearRows" class="small-btn">작업 명단 비우기</button>
+      <p class="muted small"><b>결시</b>에 체크한 학생은 쪽을 배정하지 않습니다(결시자 시험지는 스캔에서 빼세요). 스캔 순서는 <b>번호순 응시자 → 맨 아래 추가 응시자</b>. 파일 이름은 학번(학년 1 + 반 2 + 번호 2자리)+이름, 예: <code>10101홍길동.pdf</code></p>
+      <p id="eSummary" class="preview-note"></p>
+    </aside>
+    <div id="eDrop" class="drop">
+      <div class="sheet-wrap"><table class="sheet" id="eTable"><thead id="eHead"></thead><tbody id="eRows"></tbody></table></div>
+    </div>
+  </div>
+  <p class="hint">스캔한 PDF를 열고, 결시자를 체크해 쪽 수가 맞으면 저장합니다. PDF가 있는 폴더에 <code>파일이름_학생별</code> 폴더를 만들어 넣습니다.</p>
+</section>
+
+<!-- 쪽 정리 -->
+<section id="tab-organize" class="panel">
+  <div class="toolbar">
+    <button id="oOpen" class="primary">PDF 열기</button>
+    <span id="oName" class="filename"></span>
+    <button id="oRotAll">↻ 모두 90°</button>
+    <button id="oReverse">⇅ 순서 뒤집기</button>
+    <button id="oReset">처음으로</button>
+    <span class="spacer"></span>
+    <span id="oCount" class="muted"></span>
+    <button id="oRun" class="primary big" disabled>정리한 PDF 저장</button>
+  </div>
+  <div id="oDrop" class="drop thumbs-wrap">
+    <div id="oGrid" class="thumbs cards"></div>
+    <div class="empty" id="oEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div>
+  </div>
+  <p class="hint">쪽을 끌어서 순서를 바꾸고, 각 쪽의 ↻ 로 돌리고 ✕ 로 지웁니다. 거꾸로 스캔된 쪽을 바로잡을 때 좋습니다.</p>
+</section>
+
+<!-- 쪽 회전 -->
+<section id="tab-rotate" class="panel">
+  <div class="toolbar">
+    <button id="rOpen" class="primary">PDF 열기</button>
+    <span id="rName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="rRun" class="primary big" disabled>돌려서 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>돌릴 쪽</h3>
+      <input id="rRange" type="text" placeholder="비우면 전체 (예: 1~10, 15)" class="wide">
+      <label><input type="radio" name="rParity" value="all" checked> 범위 안 모든 쪽</label>
+      <label><input type="radio" name="rParity" value="odd"> 홀수 쪽만</label>
+      <label><input type="radio" name="rParity" value="even"> 짝수 쪽만</label>
+      <h3>각도 (지금 방향에서)</h3>
+      <label><input type="radio" name="rAngle" value="90" checked> 시계 방향 90°</label>
+      <label><input type="radio" name="rAngle" value="180"> 180°</label>
+      <label><input type="radio" name="rAngle" value="270"> 반시계 방향 90°</label>
+      <p class="muted small">홀수·짝수는 첫 쪽을 1쪽으로 센 번호입니다. 예: 3~8 + 짝수 → 4, 6, 8쪽. 글자와 화질은 그대로입니다.</p>
+      <p id="rNote" class="preview-note"></p>
+    </aside>
+    <div id="rDrop" class="drop thumbs-wrap"><div id="rThumbs" class="thumbs"></div><div class="empty" id="rEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div></div>
+  </div>
+</section>
+
+<!-- 두 쪽 → 한 쪽씩 -->
+<section id="tab-unspread" class="panel">
+  <div class="toolbar">
+    <button id="uOpen" class="primary">PDF 열기</button>
+    <span id="uName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="uRun" class="primary big" disabled>한 쪽씩 나눠 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>나누는 방향</h3>
+      <label><input type="radio" name="uDir" value="lr" checked> 좌 | 우 (가로 모아찍기)</label>
+      <label><input type="radio" name="uDir" value="tb"> 상 / 하 (세로 모아찍기)</label>
+      <h3>쪽 순서</h3>
+      <label><input type="radio" name="uOrder" value="first" checked> 왼쪽(위)이 먼저</label>
+      <label><input type="radio" name="uOrder" value="second"> 오른쪽(아래)이 먼저</label>
+      <h3>나눌 쪽</h3>
+      <input id="uRange" type="text" placeholder="비우면 전체 (예: 2~끝)" class="wide">
+      <p class="muted small">표지처럼 한 쪽짜리는 범위에서 빼면(예: <b>2~끝</b>) 그대로 둡니다. 화질 손실이 없습니다.</p>
+      <p id="uNote" class="preview-note"></p>
+    </aside>
+    <div id="uDrop" class="drop stage-wrap">
+      <div class="pv-nav"><button id="uPrev">◀ 이전</button><span id="uPno"></span><button id="uNext">다음 ▶</button></div>
+      <div class="stage"><div class="stage-inner" id="uInner"><canvas id="uCanvas"></canvas><div id="uLine" class="split-line"></div><div id="uTag1" class="half-tag">1</div><div id="uTag2" class="half-tag">2</div></div></div>
+      <div class="empty" id="uEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 영역 자르기 -->
+<section id="tab-crop" class="panel">
+  <div class="toolbar">
+    <button id="cOpen" class="primary">PDF 열기</button>
+    <span id="cName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="cRun" class="primary big" disabled>잘라서 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>적용할 쪽</h3>
+      <label><input type="radio" name="cParity" value="all" checked> 모든 쪽</label>
+      <label><input type="radio" name="cParity" value="odd"> 홀수 쪽만</label>
+      <label><input type="radio" name="cParity" value="even"> 짝수 쪽만</label>
+      <input id="cRange" type="text" placeholder="비우면 전체 (예: 1~10, 15)" class="wide">
+      <button id="cResetRect" class="small-btn">상자 처음으로</button>
+      <p class="muted small">파란 상자 <b>안쪽이 남습니다</b>. 상자를 끌어 옮기고 모서리 점으로 크기를 바꿉니다. 홀수·짝수 쪽 여백이 다른 책 스캔본은 홀수만 잘라 저장한 뒤, 그 파일을 다시 열어 짝수만 자르세요.</p>
+      <p id="cNote" class="preview-note"></p>
+    </aside>
+    <div id="cDrop" class="drop stage-wrap">
+      <div class="pv-nav"><button id="cPrev">◀ 이전</button><span id="cPno"></span><button id="cNext">다음 ▶</button></div>
+      <div class="stage"><div class="stage-inner" id="cInner"><canvas id="cCanvas"></canvas>
+        <div id="cRect" class="crop-rect"><i data-hd="nw"></i><i data-hd="ne"></i><i data-hd="sw"></i><i data-hd="se"></i><span id="cDim"></span></div></div></div>
+      <div class="empty" id="cEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 쪽번호 · 워터마크 -->
+<section id="tab-stamp" class="panel">
+  <div class="toolbar">
+    <button id="tOpen" class="primary">PDF 열기</button>
+    <span id="tName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="tRun" class="primary big" disabled>넣어서 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3><label><input type="checkbox" id="tNumOn" checked> 쪽번호 넣기</label></h3>
+      <label>모양 <select id="tFmt"><option value="n">1</option><option value="n/t" selected>1 / 10</option><option value="-n-">- 1 -</option></select></label>
+      <label>자리 <select id="tPos"><option value="bc" selected>아래 가운데</option><option value="br">아래 오른쪽</option><option value="bl">아래 왼쪽</option><option value="tr">위 오른쪽</option></select></label>
+      <label>시작 번호 <input id="tStart" type="number" min="1" value="1" class="num"></label>
+      <label>글자 크기 <select id="tSize"><option value="9">작게</option><option value="11" selected>보통</option><option value="14">크게</option></select></label>
+      <h3>워터마크</h3>
+      <input id="tWm" type="text" placeholder="비우면 없음 (예: 배포금지)" class="wide">
+      <label>진하기 <select id="tOp"><option value="0.08">아주 연하게</option><option value="0.14" selected>연하게</option><option value="0.25">보통</option><option value="0.4">진하게</option></select></label>
+      <label>기울기 <select id="tRot"><option value="45" selected>비스듬히(45°)</option><option value="0">수평</option></select></label>
+      <p class="muted small">한글 워터마크도 됩니다. 모든 쪽에 넣습니다.</p>
+    </aside>
+    <div id="tDrop" class="drop thumbs-wrap"><div id="tThumbs" class="thumbs"></div><div class="empty" id="tEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div></div>
+  </div>
+</section>
+
+<!-- 용량 줄이기 -->
+<section id="tab-compress" class="panel">
+  <div class="toolbar">
+    <button id="zOpen" class="primary">PDF 열기</button>
+    <span id="zName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="zRun" class="primary big" disabled>줄여서 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>줄이는 정도: <span id="zLvl">5</span>단계</h3>
+      <input id="zRange" type="range" min="1" max="10" value="5">
+      <div class="ends muted small"><span>약하게(고화질)</span><span>강하게(저용량)</span></div>
+      <p id="zDesc" class="muted small"></p>
+      <p class="muted small">K-에듀파인 등 업로드 용량 제한에 맞출 때 씁니다. 쪽을 그림으로 다시 만들기 때문에 <b>글자를 고르거나 검색할 수 없게</b> 됩니다. 스캔본·사진이 많은 PDF에 알맞고, 글자 위주 PDF는 오히려 커질 수 있습니다. 쪽 크기는 원본 그대로입니다.</p>
+      <p id="zNote" class="preview-note"></p>
+    </aside>
+    <div id="zDrop" class="drop thumbs-wrap"><div id="zThumbs" class="thumbs"></div><div class="empty" id="zEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div></div>
+  </div>
+</section>
+
+<!-- PDF → 그림 -->
+<section id="tab-toimage" class="panel">
+  <div class="toolbar">
+    <button id="iOpen" class="primary">PDF 열기</button>
+    <span id="iName" class="filename"></span>
+    <span class="spacer"></span>
+    <button id="iRun" class="primary big" disabled>그림으로 저장</button>
+  </div>
+  <div class="split-body">
+    <aside class="options">
+      <h3>형식</h3>
+      <label><input type="radio" name="iFmt" value="png" checked> PNG (선명·무손실)</label>
+      <label><input type="radio" name="iFmt" value="jpeg"> JPG (가벼움)</label>
+      <h3>해상도</h3>
+      <select id="iScale"><option value="1">보통 (1배)</option><option value="1.5" selected>좋음 (1.5배)</option><option value="2">고화질 (2배)</option><option value="3">초고화질 (3배)</option></select>
+      <h3>쪽</h3>
+      <input id="iRange" type="text" placeholder="비우면 전체 (예: 1~3, 5)" class="wide">
+      <p class="muted small">PDF가 있는 폴더에 <code>파일이름_그림</code> 폴더를 만들어 쪽마다 한 장씩 저장합니다.</p>
+      <p id="iNote" class="preview-note"></p>
+    </aside>
+    <div id="iDrop" class="drop thumbs-wrap"><div id="iThumbs" class="thumbs"></div><div class="empty" id="iEmpty"><p class="big-text">PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p></div></div>
+  </div>
+</section>
+
+<!-- 한글 변환 -->
+<section id="tab-hwp" class="panel">
+  <div class="toolbar">
+    <button id="hAdd" class="primary">한글 문서 추가</button>
+    <button id="hClear">모두 빼기</button>
+    <span class="spacer"></span>
+    <span id="hSummary" class="muted"></span>
+    <button id="hStop" class="hidden">중지</button>
+    <button id="hRun" class="primary big" disabled>PDF로 변환</button>
+    <button id="hMerge" class="big" disabled>PDF로 변환해서 합치기</button>
+    <button id="hHwpx" class="big" disabled title="hwp 문서만 바꿉니다">HWPX로 변환</button>
+  </div>
+  <div id="hDrop" class="drop">
+    <ol id="hList" class="filelist hwplist"></ol>
+    <div class="empty" id="hEmpty">
+      <p class="big-text">한글 문서(hwp, hwpx)를 여기에 끌어다 놓으세요</p>
+      <p class="muted">파일 탐색기에서 여러 한글 문서를 고른 뒤 오른쪽 클릭 → <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b>(hwp만)으로도 열 수 있습니다.<br>
+      (윈도우 11은 오른쪽 클릭 후 <b>추가 옵션 표시</b> 안에 있습니다)</p>
+    </div>
+  </div>
+  <p class="hint">PDF·HWPX는 원본과 같은 폴더에 같은 이름으로 만들고 원본은 그대로 둡니다(이미 있으면 <code>이름 (1).pdf</code>). 이 컴퓨터에 한글 프로그램이 설치되어 있어야 합니다. 암호가 걸린 문서는 바꿀 수 없습니다.</p>
+</section>
+
+</div>
+
+<!-- 서명 그리기 -->
+<div id="padModal" class="modal hidden">
+  <div class="modal-box">
+    <h3>서명 그리기</h3>
+    <canvas id="pad" width="760" height="300"></canvas>
+    <div class="pad-tools">
+      <label>굵기 <input id="padWidth" type="range" min="1" max="10" value="4"></label>
+      <label>색 <select id="padColor"><option value="#111111">검정</option><option value="#1a3fbf">파랑</option><option value="#c01818">빨강</option></select></label>
+      <span class="spacer"></span>
+      <button id="padClear">지우기</button>
+      <button id="padCancel">취소</button>
+      <button id="padOk" class="primary">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div id="setModal" class="modal hidden">
+  <div class="modal-box narrow">
+    <h3>설정</h3>
+    <label><input type="checkbox" id="ctxToggle"> 파일 탐색기 오른쪽 클릭 메뉴 보이기<br>
+      <span class="muted small">PDF: <b>PDF 합치기</b> · 한글 문서: <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b></span></label>
+    <p id="ctxNote" class="muted small"></p>
+    <label><input type="checkbox" id="m11Toggle"> 윈도우 11 오른쪽 클릭 <b>첫 화면</b>에 바로 보이기</label>
+    <p id="m11Note" class="muted small"></p>
+    <div id="m11Admin" class="hidden"><button id="m11AdminBtn" class="primary">관리자 권한으로 켜기</button></div>
+    <p class="muted small" id="verInfo"></p>
+    <details class="notice"><summary>오픈 소스 고지 (AGPL)</summary><pre id="noticeText"></pre></details>
+    <div class="right"><button id="setClose" class="primary">닫기</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<div id="busy" class="busy hidden"><div class="spinner"></div><span id="busyText">처리 중…</span></div>
+
+<script src="vendor/jszip.min.js"></script>
+<script type="module" src="renderer.js"></script>
+</body>
+</html>

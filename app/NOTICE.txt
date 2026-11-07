@@ -1,0 +1,16 @@
+PDF 도구 — 오픈 소스 고지
+
+이 프로그램은 GNU Affero 일반 공중 사용 허가서 3판(AGPL-3.0) 이상에 따라 배포됩니다.
+프로그램을 받은 사람은 같은 조건으로 소스 코드를 받을 수 있습니다. 소스 코드는 만든 사람에게 요청하세요.
+(c) 2026 j333333766
+
+함께 쓰는 부품
+- MuPDF (mupdf.js) — AGPL-3.0-or-later, © Artifex Software, Inc.  https://mupdf.com
+- pdf-lib — MIT  https://pdf-lib.js.org
+- @pdf-lib/fontkit — MIT
+- PDF.js (pdfjs-dist) — Apache-2.0, © Mozilla
+- JSZip — MIT
+- Electron — MIT (Chromium 등 포함 부품의 고지는 LICENSES.chromium.html)
+- FilePathCheckerModule.dll — 한글과컴퓨터 자동화 보안 모듈(한글 문서 변환용)
+
+글꼴은 이 컴퓨터에 설치된 맑은 고딕·함초롬바탕·함초롬돋움을 편집한 PDF에 필요한 글자만 넣어 씁니다.

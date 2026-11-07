@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 윈도우 11 우클릭 첫 화면 메뉴용 '외부 위치(sparse) 패키지'.
+     설치 폴더를 외부 위치로 등록한다: PdfTool.exe, resources\shellmenu\PdfToolShell.dll 경로는 설치 폴더 기준.
+     Clsid는 shell\PdfToolShell.cpp의 kVerbs와 같아야 한다. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop4 desktop5 com rescap">
+  <Identity Name="j333333766.PdfToolShellMenu" Publisher="CN=j333333766" Version="1.5.0.0" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>PDF 도구</DisplayName>
+    <PublisherDisplayName>j333333766</PublisherDisplayName>
+    <Logo>Assets\logo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+  <Resources>
+    <Resource Language="ko-kr" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
+  <Applications>
+    <Application Id="PdfTool" Executable="PdfTool.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements AppListEntry="none" DisplayName="PDF 도구" Description="PDF 합치기·한글 문서 변환"
+        BackgroundColor="transparent" Square150x150Logo="Assets\logo.png" Square44x44Logo="Assets\logo.png" />
+      <Extensions>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type=".pdf">
+              <desktop5:Verb Id="PdfToolMerge" Clsid="A41292F3-2C01-4035-8CBE-DC5E612C428F" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".hwp">
+              <desktop5:Verb Id="PdfToolHwp2Pdf" Clsid="A6FA80FF-D4D9-4F58-838B-CFB5D88A613C" />
+              <desktop5:Verb Id="PdfToolHwpMerge" Clsid="640235A8-A313-4ADF-846C-F6FCDA513AC1" />
+              <desktop5:Verb Id="PdfToolHwp2Hwpx" Clsid="6233F6F7-CD41-403E-88E0-59A2F22E777F" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type=".hwpx">
+              <desktop5:Verb Id="PdfToolHwp2Pdf" Clsid="A6FA80FF-D4D9-4F58-838B-CFB5D88A613C" />
+              <desktop5:Verb Id="PdfToolHwpMerge" Clsid="640235A8-A313-4ADF-846C-F6FCDA513AC1" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="PDF 도구 메뉴">
+              <com:Class Id="A41292F3-2C01-4035-8CBE-DC5E612C428F" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
+              <com:Class Id="A6FA80FF-D4D9-4F58-838B-CFB5D88A613C" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
+              <com:Class Id="640235A8-A313-4ADF-846C-F6FCDA513AC1" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
+              <com:Class Id="6233F6F7-CD41-403E-88E0-59A2F22E777F" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

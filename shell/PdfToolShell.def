@@ -1,0 +1,4 @@
+LIBRARY PdfToolShell
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE
