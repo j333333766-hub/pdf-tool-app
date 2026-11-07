@@ -4,7 +4,7 @@
 
 ## 내려받기
 
-[Releases](https://github.com/j333333766-hub/pdf-tool/releases/latest)에서 `PdfTool-Setup-x.y.z.exe`를 받아 실행합니다.
+[Releases](https://github.com/j333333766-hub/pdf-tool-app/releases/latest)에서 `PdfTool-Setup-x.y.z.exe`를 받아 실행합니다.
 
 - 윈도우 10·11 (64비트)
 - 서명되지 않은 설치 파일이라 **"Windows의 PC 보호"** 창이 뜰 수 있습니다 → **추가 정보** → **실행**
@@ -32,3 +32,5 @@ npm run dist     # 설치 파일 만들기 (dist/)
 
 AGPL-3.0-or-later. PDF 편집에 [MuPDF](https://mupdf.com)(AGPL)를 씁니다. 자세한 고지는 `app/NOTICE.txt`.
 `build/hwp/FilePathCheckerModule.dll`은 한컴 오토메이션 보안 승인 모듈 예제입니다.
+
+웹 브라우저에서 바로 쓰는 판(PDF 종합툴)은 [pdf-tool](https://github.com/j333333766-hub/pdf-tool)에 있습니다.
