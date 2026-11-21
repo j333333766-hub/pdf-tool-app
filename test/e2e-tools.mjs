@@ -193,27 +193,38 @@ await nextSave(out);
 await win.click('#tRun');
 check('쪽번호·워터마크', await waitFile(out) && fs.statSync(out).size > fs.statSync(A).size + 1000, `${fs.statSync(A).size} → ${fs.existsSync(out) ? fs.statSync(out).size : 0}바이트`);
 
-// 9) 용량 줄이기 — 열면 10단계를 모두 만들고, 실제 임시 파일 크기를 보여 주며, 고른 단계만 저장
+// 9) 용량 줄이기 — 체크한 단계만, 체크한 순서대로 실제로 만들고, 고른 단계만 저장
 await tab('compress');
 await openIn('z', W);
 {
-  const t0 = Date.now();
-  while (await win.isDisabled('#zRun') && Date.now() - t0 < 120000) await sleep(300);
-  const rows = await win.$$eval('.zrow[data-i]', (els) => els.map((e) => e.querySelector('.zs').textContent));
   const ud = path.join(dir, 'userdata', 'compress-tmp');
-  const keyDir = fs.readdirSync(ud).map((k) => path.join(ud, k))[0];
-  const real = Array.from({ length: 10 }, (_, i) => fs.statSync(path.join(keyDir, `${i + 1}.pdf`)).size);
+  const made = () => (fs.existsSync(ud) ? fs.readdirSync(ud).flatMap((k) => fs.readdirSync(path.join(ud, k)).map((f) => path.join(ud, k, f))) : []);
+  check('열기만 하면 아무 단계도 만들지 않음', made().length === 0 && (await win.$$eval('.zrow[data-i] .zs', (e) => e.every((x) => !x.textContent))));
+  // 7 → 2 → 9 순서로 체크
+  await win.click('.zrow[data-i="6"] .zc');
+  await win.click('.zrow[data-i="1"] .zc');
+  await win.click('.zrow[data-i="8"] .zc');
+  const order = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < 120000) {
+    for (const f of made()) { const l = Number(path.basename(f, '.pdf')); if (!order.includes(l)) order.push(l); }
+    if (order.length === 3 && (await win.$$eval('.zrow[data-i] .zs', (e) => e.filter((x) => /KB|MB/.test(x.textContent)).length)) === 3) break;
+    await sleep(50);
+  }
+  check('체크한 순서대로 3개만 만듦', JSON.stringify(order) === '[7,2,9]' && made().length === 3, order.join('→'));
   const fmt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
-  check('용량 줄이기 10단계 모두 만듦', rows.length === 10 && real.length === 10, rows.join(' | '));
-  check('보이는 크기 = 실제 파일 크기', rows.every((r, i) => r.startsWith(fmt(real[i]))), real.join(','));
-  await win.click('.zrow[data-i="8"]');
+  const shown = await win.$$eval('.zrow[data-i]', (els) => els.map((e) => e.querySelector('.zs').textContent));
+  const real = (l) => fs.statSync(made().find((f) => path.basename(f) === `${l}.pdf`)).size;
+  check('보이는 크기 = 실제 파일 크기', [7, 2, 9].every((l) => shown[l - 1].startsWith(fmt(real(l)))) && shown.filter((x) => x).length === 3, shown.map((x, i) => (x ? `${i + 1}:${x}` : '')).filter(Boolean).join(' '));
+  check('처음 나온 7단계가 골라져 있음', (await win.textContent('#zSave')) === '7단계 저장');
+  await win.click('.zrow[data-i="8"] .zp');
   out = path.join(dir, 'small.pdf');
   await nextSave(out);
   await win.click('#zSave');
   if (await waitFile(out, 30000)) {
     const p = (await load(out)).getPages();
-    check('고른 9단계만 저장(쪽 크기 유지)', p.length === 3 && Math.round(p[0].getWidth()) === 842 && fs.statSync(out).size === real[8]
-      && fs.readdirSync(dir).filter((f) => /\.pdf$/i.test(f) && f !== 'small.pdf').every((f) => !/용량줄임/.test(f)), `${fs.statSync(out).size}바이트`);
+    check('고른 9단계만 저장(쪽 크기 유지)', p.length === 3 && Math.round(p[0].getWidth()) === 842 && fs.statSync(out).size === real(9)
+      && !fs.readdirSync(dir).some((f) => /용량줄임/.test(f)), `${fs.statSync(out).size}바이트`);
   } else check('고른 9단계만 저장', false);
 }
 await win.screenshot({ path: `${shots}/t9-compress.png` });

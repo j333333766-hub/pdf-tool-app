@@ -412,99 +412,157 @@ export function initTools(ctx) {
       [1.4, 0.82, '표준 추천'], [1.3, 0.75, '용량 감소 체감'], [1.2, 0.65, '10MB 제한용'], [1.0, 0.55, '5MB 제한용'],
       [0.8, 0.4, '강력 압축'], [0.6, 0.25, '비상용 최소 용량'],
     ];
-    // 열면 10단계를 모두 실제로 만들어(임시 폴더) 크기를 보여 주고, 고른 단계의 파일만 저장한다
+    // 체크한 단계만, 체크한 순서대로 임시 폴더에 실제로 만들어 크기를 보여 주고, 고른 단계의 파일만 저장한다
     const fmt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
-    const z = { key: null, gen: 0, sizes: [], pick: 0, orig: 0, running: false };
+    // lv[i]: { want: 체크됨, state: 'off'|'wait'|'run'|'done'|'err', size, prog }
+    const z = { key: null, gen: 0, orig: 0, queue: [], lv: [], pick: 0, busy: false };
     const st = single('z', async (s, token) => {
       thumbGrid($('#zThumbs'), s, token);
-      buildAll();
+      await reset();
     });
+    const rowEl = (i) => $('#zList').querySelector(`.zrow[data-i="${i}"]`);
 
-    function row(i) {
-      const el = document.createElement('label');
-      el.className = 'zrow off';
-      el.innerHTML = '<input type="radio" name="zPick" disabled><span class="zn"><b></b><span class="zd"></span></span><span class="zs"></span>';
-      el.querySelector('b').textContent = `${i + 1}단계`;
-      el.querySelector('.zd').textContent = LEVELS[i][2];
-      el.querySelector('.zs').textContent = '기다림';
-      el.querySelector('input').onchange = () => { z.pick = i + 1; renderPick(); };
-      return el;
-    }
-    function renderPick() {
-      $('#zList').querySelectorAll('.zrow[data-i]').forEach((el) => el.classList.toggle('sel', Number(el.dataset.i) === z.pick - 1));
-      $('#zSave').disabled = !z.pick || z.running;
-      $('#zSave').textContent = z.pick ? `${z.pick}단계 저장` : '고른 단계 저장';
-    }
-    function setSize(i, size) {
-      const el = $('#zList').querySelector(`.zrow[data-i="${i}"]`);
-      const pct = Math.round((1 - size / z.orig) * 100);
-      const s = el.querySelector('.zs');
-      s.textContent = fmt(size);
-      const sm = document.createElement('small');
-      sm.textContent = pct > 0 ? `−${pct}%` : '원본보다 큼';
-      sm.style.display = 'block';
-      s.classList.toggle('big', pct <= 0);
-      s.append(sm);
-      el.classList.remove('off');
-      el.querySelector('input').disabled = false;
-    }
-
-    async function buildAll() {
-      const gen = ++z.gen, token = st.token;
+    async function reset() {
+      z.gen++;
       if (z.key) api.compressClear(z.key);
       z.key = `${Date.now()}`;
-      const key = z.key;
-      z.sizes = []; z.pick = 0; z.running = true;
-      z.orig = await api.fileSize(st.path);
+      z.queue = []; z.pick = 0; z.busy = false;
+      z.lv = LEVELS.map(() => ({ want: false, state: 'off', size: 0, prog: '' }));
+      z.orig = st.path ? await api.fileSize(st.path) : 0;
       const list = $('#zList');
       list.replaceChildren();
-      const o = document.createElement('div');
-      o.className = 'zrow orig';
-      o.innerHTML = '<span></span><span class="zn"><b>원본</b></span><span class="zs"></span>';
-      o.querySelector('.zs').textContent = fmt(z.orig);
-      list.append(o);
-      LEVELS.forEach((_, i) => { const el = row(i); el.dataset.i = i; list.append(el); });
       $('#zNote').classList.remove('err');
       $('#zNote').textContent = '';
-      $('#zRun').disabled = true;
-      renderPick();
+      if (st.path) {
+        const o = document.createElement('div');
+        o.className = 'zrow orig';
+        o.innerHTML = '<span class="zc"></span><span class="zn"><b>원본</b></span><span class="zs"></span><span class="zp"></span>';
+        o.querySelector('.zs').textContent = fmt(z.orig);
+        list.append(o);
+        LEVELS.forEach((lvl, i) => {
+          const el = document.createElement('div');
+          el.className = 'zrow';
+          el.dataset.i = i;
+          el.innerHTML = '<input type="checkbox" class="zc" title="이 단계 크기 재기"><span class="zn"><b></b><span class="zd"></span></span><span class="zs"></span><input type="radio" name="zPick" class="zp" title="이 단계를 저장" disabled>';
+          el.querySelector('b').textContent = `${i + 1}단계`;
+          el.querySelector('.zd').textContent = lvl[2];
+          el.querySelector('.zc').onchange = (e) => toggle(i, e.target.checked);
+          // 이름을 눌러도 된다: 크기가 나왔으면 저장할 단계로 고르기, 아니면 체크
+          el.querySelector('.zn').onclick = () => {
+            if (z.lv[i].state === 'done') pick(i + 1);
+            else toggle(i, !z.lv[i].want);
+          };
+          el.querySelector('.zp').onchange = () => pick(i + 1);
+          list.append(el);
+        });
+      }
+      renderAll();
+    }
+
+    function renderRow(i) {
+      const el = rowEl(i);
+      if (!el) return;
+      const L = z.lv[i], s = el.querySelector('.zs');
+      el.querySelector('.zc').checked = L.want;
+      s.className = 'zs';
+      s.replaceChildren();
+      if (L.state === 'wait') { s.classList.add('wait'); s.textContent = `대기 ${z.queue.indexOf(i) + 1}번째`; }
+      else if (L.state === 'run') { s.classList.add('wait'); s.textContent = L.prog || '만드는 중…'; }
+      else if (L.state === 'err') { s.classList.add('wait'); s.textContent = '만들지 못함'; }
+      else if (L.state === 'done') {
+        const pct = Math.round((1 - L.size / z.orig) * 100);
+        s.textContent = fmt(L.size);
+        const sm = document.createElement('small');
+        sm.textContent = pct > 0 ? `−${pct}%` : '원본보다 큼';
+        s.classList.toggle('big', pct <= 0);
+        s.append(sm);
+      }
+      const r = el.querySelector('.zp');
+      r.disabled = L.state !== 'done';
+      r.checked = z.pick === i + 1;
+      el.classList.toggle('sel', z.pick === i + 1);
+    }
+    function renderAll() {
+      z.lv.forEach((_, i) => renderRow(i));
+      const ok = !!z.pick && z.lv[z.pick - 1] && z.lv[z.pick - 1].state === 'done';
+      $('#zSave').disabled = !ok;
+      $('#zSave').textContent = ok ? `${z.pick}단계 저장` : '고른 단계 저장';
+      $('#zRun').disabled = !st.path || !z.lv.some((L) => L.want);
+    }
+    function pick(lvl) { z.pick = lvl; renderAll(); }
+
+    function toggle(i, on) {
+      const L = z.lv[i];
+      L.want = on;
+      if (on) {
+        if (L.state === 'off' || L.state === 'err') { L.state = 'wait'; z.queue.push(i); }
+      } else {
+        // 체크를 풀면: 대기 중이면 빼고, 만든 것은 크기를 감춘다(만드는 중이면 끝나는 대로 버림)
+        z.queue = z.queue.filter((k) => k !== i);
+        if (L.state !== 'run') L.state = 'off';
+        if (z.pick === i + 1) z.pick = 0;
+      }
+      renderAll();
+      work();
+    }
+
+    // 대기열을 하나씩 처리 — 체크한 순서대로
+    async function work() {
+      if (z.busy) return;
+      z.busy = true;
+      const gen = z.gen, token = st.token, key = z.key;
       const alive = () => gen === z.gen && token === st.token;
       try {
-        for (let i = 0; i < LEVELS.length; i++) {
+        while (alive() && z.queue.length) {
+          const i = z.queue.shift();
+          const L = z.lv[i];
+          if (!L.want) continue;
+          L.state = 'run';
+          renderAll();
           const [scale, quality] = LEVELS[i];
-          const sEl = list.querySelector(`.zrow[data-i="${i}"] .zs`);
-          const pages = [];
-          for (let p = 0; p < st.total; p++) {
+          try {
+            const pages = [];
+            for (let p = 0; p < st.total && L.want; p++) {
+              if (!alive()) return;
+              L.prog = `만드는 중 ${p + 1}/${st.total}쪽`;
+              renderRow(i);
+              const im = await pageImage(st.doc, p, scale, 'image/jpeg', quality);
+              pages.push({ jpg: im.bytes, w: im.w, h: im.h });
+            }
             if (!alive()) return;
-            sEl.textContent = `만드는 중 ${p + 1}/${st.total}쪽`;
-            const im = await pageImage(st.doc, p, scale, 'image/jpeg', quality);
-            pages.push({ jpg: im.bytes, w: im.w, h: im.h });
+            if (!L.want) { L.state = 'off'; renderAll(); continue; }
+            L.prog = '저장하는 중…';
+            renderRow(i);
+            const res = await api.compressTemp(key, i + 1, pages);
+            if (!alive()) return;
+            if (!res.ok) throw new Error(res.error);
+            L.size = res.value.size;
+            L.state = L.want ? 'done' : 'off';
+            // 처음 나온 단계는 바로 골라 둔다(다른 것을 고를 수 있음)
+            if (L.state === 'done' && !z.pick) z.pick = i + 1;
+          } catch (e) {
+            if (!alive()) return;
+            L.state = 'err';
+            $('#zNote').classList.add('err');
+            $('#zNote').textContent = `${i + 1}단계를 만들지 못했습니다: ${e.message || e}`;
           }
-          if (!alive()) return;
-          sEl.textContent = '저장하는 중…';
-          const res = await api.compressTemp(key, i + 1, pages);
-          if (!alive()) return;
-          if (!res.ok) throw new Error(res.error);
-          z.sizes[i] = res.value.size;
-          setSize(i, res.value.size);
+          renderAll();
         }
-        const best = z.sizes.findIndex((b) => b < z.orig);
-        $('#zNote').textContent = best < 0
-          ? '모든 단계가 원본보다 큽니다. 글자 위주로 만든 PDF는 이 방법으로 줄지 않습니다(스캔본·사진이 많은 PDF에 알맞음). 원본을 그대로 쓰세요.'
-          : '크기는 실제로 만든 파일의 크기입니다. 하나를 고르고 저장하세요.';
-      } catch (e) {
-        if (!alive()) return;
-        $('#zNote').classList.add('err');
-        $('#zNote').textContent = `만들지 못했습니다: ${e.message || e}`;
+        if (alive() && !$('#zNote').classList.contains('err')) {
+          const done = z.lv.filter((L) => L.state === 'done');
+          $('#zNote').textContent = done.length && done.every((L) => L.size >= z.orig)
+            ? '고른 단계가 모두 원본보다 큽니다. 더 높은 단계를 골라 보세요. 글자 위주로 만든 PDF는 이 방법으로 잘 줄지 않습니다(스캔본·사진이 많은 PDF에 알맞음).'
+            : '';
+        }
       } finally {
-        if (gen === z.gen) { z.running = false; $('#zRun').disabled = !st.path; renderPick(); }
+        if (gen === z.gen) z.busy = false;
       }
     }
 
-    $('#zRun').onclick = () => { if (st.path) buildAll(); };
+    $('#zRun').onclick = () => reset();
     $('#zSave').onclick = async () => {
-      if (!z.pick || z.running) return;
       const lvl = z.pick;
+      if (!lvl || z.lv[lvl - 1].state !== 'done') return;
       const out = await savePdfNear(st.path, `용량줄임${lvl}단계`);
       if (!out) return;
       const res = await api.compressSave(z.key, lvl, out);
