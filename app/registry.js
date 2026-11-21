@@ -7,6 +7,7 @@ const BASE = 'HKCU\\Software\\Classes\\SystemFileAssociations';
 const ENTRIES = [
   ['.pdf', 'PdfToolView', 'PDF 도구로 보기', '--view'],
   ['.pdf', 'PdfToolMerge', 'PDF 합치기', '--merge'],
+  ['.pdf', 'PdfToolCompress', 'PDF 용량 줄이기', '--compress'],
   ['.hwp', 'PdfToolHwp2Pdf', 'PDF로 변환', '--hwp2pdf'],
   ['.hwp', 'PdfToolHwpMerge', 'PDF로 변환해서 합치기', '--hwpmerge'],
   ['.hwp', 'PdfToolHwp2Hwpx', 'HWPX로 변환', '--hwp2hwpx'],

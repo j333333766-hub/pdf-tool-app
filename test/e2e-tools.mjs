@@ -193,18 +193,29 @@ await nextSave(out);
 await win.click('#tRun');
 check('쪽번호·워터마크', await waitFile(out) && fs.statSync(out).size > fs.statSync(A).size + 1000, `${fs.statSync(A).size} → ${fs.existsSync(out) ? fs.statSync(out).size : 0}바이트`);
 
-// 9) 용량 줄이기 (쪽 크기 유지)
+// 9) 용량 줄이기 — 열면 10단계를 모두 만들고, 실제 임시 파일 크기를 보여 주며, 고른 단계만 저장
 await tab('compress');
 await openIn('z', W);
-await win.fill('#zRange', '9');
-await win.dispatchEvent('#zRange', 'input');
-out = path.join(dir, 'small.pdf');
-await nextSave(out);
-await win.click('#zRun');
-if (await waitFile(out, 60000)) {
-  const p = (await load(out)).getPages();
-  check('용량 줄이기', p.length === 3 && Math.round(p[0].getWidth()) === 842, (await win.textContent('#zNote')).replace(/\n/g, ' '));
-} else check('용량 줄이기', false);
+{
+  const t0 = Date.now();
+  while (await win.isDisabled('#zRun') && Date.now() - t0 < 120000) await sleep(300);
+  const rows = await win.$$eval('.zrow[data-i]', (els) => els.map((e) => e.querySelector('.zs').textContent));
+  const ud = path.join(dir, 'userdata', 'compress-tmp');
+  const keyDir = fs.readdirSync(ud).map((k) => path.join(ud, k))[0];
+  const real = Array.from({ length: 10 }, (_, i) => fs.statSync(path.join(keyDir, `${i + 1}.pdf`)).size);
+  const fmt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
+  check('용량 줄이기 10단계 모두 만듦', rows.length === 10 && real.length === 10, rows.join(' | '));
+  check('보이는 크기 = 실제 파일 크기', rows.every((r, i) => r.startsWith(fmt(real[i]))), real.join(','));
+  await win.click('.zrow[data-i="8"]');
+  out = path.join(dir, 'small.pdf');
+  await nextSave(out);
+  await win.click('#zSave');
+  if (await waitFile(out, 30000)) {
+    const p = (await load(out)).getPages();
+    check('고른 9단계만 저장(쪽 크기 유지)', p.length === 3 && Math.round(p[0].getWidth()) === 842 && fs.statSync(out).size === real[8]
+      && fs.readdirSync(dir).filter((f) => /\.pdf$/i.test(f) && f !== 'small.pdf').every((f) => !/용량줄임/.test(f)), `${fs.statSync(out).size}바이트`);
+  } else check('고른 9단계만 저장', false);
+}
 await win.screenshot({ path: `${shots}/t9-compress.png` });
 
 // 10) PDF → 그림 (1, 3쪽 PNG)

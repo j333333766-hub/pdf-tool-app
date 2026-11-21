@@ -873,6 +873,10 @@ api.onOpenFiles(({ mode, files }) => {
   } else if (mode === 'sign') {
     showTab('sign');
     openSign(files[0]);
+  } else if (mode === 'compress') {
+    // 여러 개를 골랐으면 첫 파일만 (한 번에 하나씩 단계를 비교한다)
+    openIn('compress', files[0]);
+    if (files.length > 1) toast(`여러 파일을 골랐습니다. 용량 줄이기는 한 번에 하나씩 합니다: ${baseName(files[0])}`);
   } else {
     showTab('view');
     viewer.open(files[0]);

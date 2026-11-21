@@ -9,14 +9,14 @@ const pdfedit = require('./pdfedit');
 
 // --view a.pdf  /  --merge a.pdf b.pdf  /  --split a.pdf  /  --sign a.pdf  /  a.pdf(그냥 열기 = 보기 화면)
 // --hwp2pdf a.hwp b.hwpx (PDF로 변환)  /  --hwpmerge a.hwp b.hwpx (PDF로 변환해서 합치기)  /  --hwp2hwpx a.hwp (HWPX로 변환)
-// --hwp2hwpx-del a.hwp (HWPX로 변환하고 원본 hwp는 휴지통으로)
+// --hwp2hwpx-del a.hwp (HWPX로 변환하고 원본 hwp는 휴지통으로)  /  --compress a.pdf (용량 줄이기: 10단계 실제 크기 보기)
 function parseArgs(argv) {
   // 두 번째 실행에서 넘어온 argv는 Chromium이 스위치를 앞으로 옮겨 순서가 바뀌므로 자르지 말고 전부 훑는다
   const args = argv.slice(1);
   let mode = null;
   const files = [];
   for (const a of args) {
-    if (['--view', '--merge', '--split', '--sign', '--hwp2pdf', '--hwpmerge', '--hwp2hwpx', '--hwp2hwpx-del'].includes(a)) mode = a.slice(2);
+    if (['--view', '--merge', '--split', '--sign', '--hwp2pdf', '--hwpmerge', '--hwp2hwpx', '--hwp2hwpx-del', '--compress'].includes(a)) mode = a.slice(2);
     else if (/\.(pdf|hwpx?)$/i.test(a) && fs.existsSync(a)) files.push(path.resolve(a));
   }
   if (files.length && !mode) mode = files.every((f) => hwp.HWP_RE.test(f)) ? 'hwp2pdf' : 'view';
@@ -56,6 +56,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(start);
   app.on('window-all-closed', () => app.quit());
+  // 끝낼 때 용량 줄이기 단계별 임시 PDF를 지운다(고른 것은 이미 복사됨)
+  app.on('will-quit', () => { try { fs.rmSync(zipTmpRoot(), { recursive: true, force: true }); } catch {} });
 }
 
 function start() {
@@ -89,6 +91,8 @@ function start() {
   });
   // 지난번 '변환해서 합치기'에서 남은 임시 PDF 정리
   fs.rm(hwpTmpRoot(), { recursive: true, force: true }, () => {});
+  // 지난번 용량 줄이기에서 남은 단계별 임시 PDF 정리
+  fs.rm(zipTmpRoot(), { recursive: true, force: true }, () => {});
   // 설치본이면 우클릭 메뉴가 지금 실행 파일을 가리키도록 맞춰 둔다
   if (app.isPackaged) {
     registry.isRegistered(process.execPath).then((ok) => { if (!ok) registry.register(process.execPath); });
@@ -111,6 +115,12 @@ const PDF_FILTER = [{ name: 'PDF', extensions: ['pdf'] }];
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
 const sigDir = () => path.join(app.getPath('userData'), 'signatures');
 const hwpTmpRoot = () => path.join(app.getPath('userData'), 'hwp-merge');
+const zipTmpRoot = () => path.join(app.getPath('userData'), 'compress-tmp');
+// 용량 줄이기 임시 파일: compress-tmp/<묶음>/<단계>.pdf — 묶음·단계는 숫자만 받는다
+function zipTmpFile(key, lvl) {
+  if (!/^\d{1,20}$/.test(String(key)) || !(lvl >= 1 && lvl <= 10)) throw new Error('잘못된 단계입니다.');
+  return path.join(zipTmpRoot(), String(key), `${Math.trunc(lvl)}.pdf`);
+}
 
 // 앱 설정 (settings.json)
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -175,6 +185,20 @@ ipcMain.handle('from-jpegs', wrap((_e, pages, out) => core.fromJpegs(pages, out)
 ipcMain.handle('split-named', wrap((_e, file, tasks, dir, folder) => core.splitNamed(file, tasks, dir, folder)));
 ipcMain.handle('write-files', wrap((_e, dir, folder, files) => core.writeFiles(dir, folder, files)));
 ipcMain.handle('file-size', async (_e, p) => (await fs.promises.stat(p)).size);
+// 용량 줄이기: 단계별 파일을 임시 폴더에 실제로 만들어 크기를 재고, 고른 것만 저장 위치로 복사한다
+ipcMain.handle('compress-temp', wrap(async (_e, key, lvl, pages) => {
+  const out = zipTmpFile(key, lvl);
+  await fs.promises.mkdir(path.dirname(out), { recursive: true });
+  return core.fromJpegs(pages, out);
+}));
+ipcMain.handle('compress-save', wrap(async (_e, key, lvl, out) => {
+  await fs.promises.copyFile(zipTmpFile(key, lvl), out);
+  return { outPath: out, size: (await fs.promises.stat(out)).size };
+}));
+ipcMain.handle('compress-clear', wrap(async (_e, key) => {
+  await fs.promises.rm(path.dirname(zipTmpFile(key, 1)), { recursive: true, force: true });
+  return true;
+}));
 
 // 학교 명렬표 — 앱 설정 폴더에 보관(학생 이름이 들어 있으므로 이 컴퓨터 사용자 폴더에만)
 const rosterFile = () => path.join(app.getPath('userData'), 'roster.json');

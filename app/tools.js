@@ -412,35 +412,104 @@ export function initTools(ctx) {
       [1.4, 0.82, '표준 추천'], [1.3, 0.75, '용량 감소 체감'], [1.2, 0.65, '10MB 제한용'], [1.0, 0.55, '5MB 제한용'],
       [0.8, 0.4, '강력 압축'], [0.6, 0.25, '비상용 최소 용량'],
     ];
+    // 열면 10단계를 모두 실제로 만들어(임시 폴더) 크기를 보여 주고, 고른 단계의 파일만 저장한다
+    const fmt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
+    const z = { key: null, gen: 0, sizes: [], pick: 0, orig: 0, running: false };
     const st = single('z', async (s, token) => {
       thumbGrid($('#zThumbs'), s, token);
-      const size = await api.fileSize(s.path);
-      $('#zNote').classList.remove('err');
-      $('#zNote').textContent = `원본 용량: ${fmt(size)}`;
+      buildAll();
     });
-    const fmt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
-    const showLvl = () => { const v = Number($('#zRange').value); $('#zLvl').textContent = v; $('#zDesc').textContent = LEVELS[v - 1][2]; };
-    $('#zRange').oninput = showLvl;
-    showLvl();
-    $('#zRun').onclick = async () => {
-      const lvl = Number($('#zRange').value), [scale, quality] = LEVELS[lvl - 1];
+
+    function row(i) {
+      const el = document.createElement('label');
+      el.className = 'zrow off';
+      el.innerHTML = '<input type="radio" name="zPick" disabled><span class="zn"><b></b><span class="zd"></span></span><span class="zs"></span>';
+      el.querySelector('b').textContent = `${i + 1}단계`;
+      el.querySelector('.zd').textContent = LEVELS[i][2];
+      el.querySelector('.zs').textContent = '기다림';
+      el.querySelector('input').onchange = () => { z.pick = i + 1; renderPick(); };
+      return el;
+    }
+    function renderPick() {
+      $('#zList').querySelectorAll('.zrow[data-i]').forEach((el) => el.classList.toggle('sel', Number(el.dataset.i) === z.pick - 1));
+      $('#zSave').disabled = !z.pick || z.running;
+      $('#zSave').textContent = z.pick ? `${z.pick}단계 저장` : '고른 단계 저장';
+    }
+    function setSize(i, size) {
+      const el = $('#zList').querySelector(`.zrow[data-i="${i}"]`);
+      const pct = Math.round((1 - size / z.orig) * 100);
+      const s = el.querySelector('.zs');
+      s.textContent = fmt(size);
+      const sm = document.createElement('small');
+      sm.textContent = pct > 0 ? `−${pct}%` : '원본보다 큼';
+      sm.style.display = 'block';
+      s.classList.toggle('big', pct <= 0);
+      s.append(sm);
+      el.classList.remove('off');
+      el.querySelector('input').disabled = false;
+    }
+
+    async function buildAll() {
+      const gen = ++z.gen, token = st.token;
+      if (z.key) api.compressClear(z.key);
+      z.key = `${Date.now()}`;
+      const key = z.key;
+      z.sizes = []; z.pick = 0; z.running = true;
+      z.orig = await api.fileSize(st.path);
+      const list = $('#zList');
+      list.replaceChildren();
+      const o = document.createElement('div');
+      o.className = 'zrow orig';
+      o.innerHTML = '<span></span><span class="zn"><b>원본</b></span><span class="zs"></span>';
+      o.querySelector('.zs').textContent = fmt(z.orig);
+      list.append(o);
+      LEVELS.forEach((_, i) => { const el = row(i); el.dataset.i = i; list.append(el); });
+      $('#zNote').classList.remove('err');
+      $('#zNote').textContent = '';
+      $('#zRun').disabled = true;
+      renderPick();
+      const alive = () => gen === z.gen && token === st.token;
+      try {
+        for (let i = 0; i < LEVELS.length; i++) {
+          const [scale, quality] = LEVELS[i];
+          const sEl = list.querySelector(`.zrow[data-i="${i}"] .zs`);
+          const pages = [];
+          for (let p = 0; p < st.total; p++) {
+            if (!alive()) return;
+            sEl.textContent = `만드는 중 ${p + 1}/${st.total}쪽`;
+            const im = await pageImage(st.doc, p, scale, 'image/jpeg', quality);
+            pages.push({ jpg: im.bytes, w: im.w, h: im.h });
+          }
+          if (!alive()) return;
+          sEl.textContent = '저장하는 중…';
+          const res = await api.compressTemp(key, i + 1, pages);
+          if (!alive()) return;
+          if (!res.ok) throw new Error(res.error);
+          z.sizes[i] = res.value.size;
+          setSize(i, res.value.size);
+        }
+        const best = z.sizes.findIndex((b) => b < z.orig);
+        $('#zNote').textContent = best < 0
+          ? '모든 단계가 원본보다 큽니다. 글자 위주로 만든 PDF는 이 방법으로 줄지 않습니다(스캔본·사진이 많은 PDF에 알맞음). 원본을 그대로 쓰세요.'
+          : '크기는 실제로 만든 파일의 크기입니다. 하나를 고르고 저장하세요.';
+      } catch (e) {
+        if (!alive()) return;
+        $('#zNote').classList.add('err');
+        $('#zNote').textContent = `만들지 못했습니다: ${e.message || e}`;
+      } finally {
+        if (gen === z.gen) { z.running = false; $('#zRun').disabled = !st.path; renderPick(); }
+      }
+    }
+
+    $('#zRun').onclick = () => { if (st.path) buildAll(); };
+    $('#zSave').onclick = async () => {
+      if (!z.pick || z.running) return;
+      const lvl = z.pick;
       const out = await savePdfNear(st.path, `용량줄임${lvl}단계`);
       if (!out) return;
-      const res = await busy('줄이는 중…', async () => {
-        const pages = [];
-        for (let p = 0; p < st.total; p++) {
-          $('#busyText').textContent = `줄이는 중… (${p + 1}/${st.total}쪽)`;
-          const im = await pageImage(st.doc, p, scale, 'image/jpeg', quality);
-          pages.push({ jpg: im.bytes, w: im.w, h: im.h });
-        }
-        $('#busyText').textContent = '저장하는 중…';
-        return api.fromJpegs(pages, out);
-      });
+      const res = await api.compressSave(z.key, lvl, out);
       if (!res.ok) return toast(res.error, { err: true });
-      const before = await api.fileSize(st.path), after = res.value.size;
-      const pct = Math.round((1 - after / before) * 100);
-      $('#zNote').textContent = `원본 ${fmt(before)} → ${fmt(after)}\n${pct > 0 ? `약 ${pct}% 줄었습니다.` : '원본보다 커졌습니다. 글자 위주로 만든 PDF는 이 방법으로 잘 줄지 않습니다(스캔본·사진이 많은 PDF에 알맞음). 단계를 높이거나 원본을 쓰세요.'}`;
-      savedToast(`${fmt(before)} → ${fmt(after)} 로 저장했습니다: ${baseName(out)}`, out);
+      savedToast(`${fmt(z.orig)} → ${fmt(res.value.size)} (${lvl}단계)로 저장했습니다: ${baseName(out)}`, out);
     };
   }
 

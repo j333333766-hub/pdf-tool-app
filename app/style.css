@@ -265,3 +265,20 @@ nav.side .group { color: #8b919e; font-size: 11.5px; font-weight: 700; margin: 1
 .textLayer span.hl.sel { background: rgba(255, 110, 0, .6); }
 #tab-view .filename { max-width: 340px; min-width: 0; flex: 0 1 auto; }
 #tab-view .toolbar .vsearch input { width: 170px; }
+
+/* 용량 줄이기 — 단계별 실제 크기 */
+.zlist { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 10px; }
+.zrow { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-size: 13px; }
+.zrow > :first-child { flex: 0 0 16px; margin: 0; }
+.zrow:hover { background: #f1f2f4; }
+.zrow.sel { background: var(--sel); border-color: #f3c4bf; }
+.zrow.off { cursor: default; opacity: .55; }
+.zrow.off:hover { background: none; }
+.zrow .zn { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.zrow .zn b { white-space: nowrap; }
+.zrow .zd { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zrow .zs { flex: 0 0 86px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.zrow .zs small { color: var(--muted); font-size: 11.5px; }
+.zrow .zs.big small { color: var(--accent-d); }
+.zrow.orig { cursor: default; border-bottom: 1px solid var(--line); border-radius: 0; margin-bottom: 2px; }
+.zrow.orig:hover { background: none; }

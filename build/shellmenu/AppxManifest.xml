@@ -11,7 +11,7 @@
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap10 desktop4 desktop5 com rescap">
-  <Identity Name="j333333766.PdfToolShellMenu" Publisher="CN=j333333766" Version="1.6.1.0" ProcessorArchitecture="x64" />
+  <Identity Name="j333333766.PdfToolShellMenu" Publisher="CN=j333333766" Version="1.7.0.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>PDF 도구</DisplayName>
     <PublisherDisplayName>j333333766</PublisherDisplayName>
@@ -38,6 +38,7 @@
             <desktop5:ItemType Type=".pdf">
               <desktop5:Verb Id="PdfToolView" Clsid="43F6F2BA-A25A-4A70-9ACE-073AE79B25A4" />
               <desktop5:Verb Id="PdfToolMerge" Clsid="A41292F3-2C01-4035-8CBE-DC5E612C428F" />
+              <desktop5:Verb Id="PdfToolCompress" Clsid="09B34671-0A28-4EA4-87A0-07D4BDC4DC97" />
             </desktop5:ItemType>
             <desktop5:ItemType Type=".hwp">
               <desktop5:Verb Id="PdfToolHwp2Pdf" Clsid="A6FA80FF-D4D9-4F58-838B-CFB5D88A613C" />
@@ -60,6 +61,7 @@
               <com:Class Id="6233F6F7-CD41-403E-88E0-59A2F22E777F" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
               <com:Class Id="43F6F2BA-A25A-4A70-9ACE-073AE79B25A4" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
               <com:Class Id="F380260B-C26A-481A-8FE6-5313A94C1B26" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
+              <com:Class Id="09B34671-0A28-4EA4-87A0-07D4BDC4DC97" Path="resources\shellmenu\PdfToolShell.dll" ThreadingModel="STA" />
             </com:SurrogateServer>
           </com:ComServer>
         </com:Extension>

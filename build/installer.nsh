@@ -28,6 +28,7 @@
 !macro customInstall
   !insertmacro PdfToolVerb ".pdf" "PdfToolView" "PDF 도구로 보기" "--view"
   !insertmacro PdfToolVerb ".pdf" "PdfToolMerge" "PDF 합치기" "--merge"
+  !insertmacro PdfToolVerb ".pdf" "PdfToolCompress" "PDF 용량 줄이기" "--compress"
   !insertmacro PdfToolVerb ".hwp" "PdfToolHwp2Pdf" "PDF로 변환" "--hwp2pdf"
   !insertmacro PdfToolVerb ".hwp" "PdfToolHwpMerge" "PDF로 변환해서 합치기" "--hwpmerge"
   !insertmacro PdfToolVerb ".hwp" "PdfToolHwp2Hwpx" "HWPX로 변환" "--hwp2hwpx"
@@ -48,6 +49,7 @@
   ${ifNot} ${isUpdated}
     DeleteRegKey HKCU "${PDFTOOL_SFA}\.pdf\shell\PdfToolView"
     DeleteRegKey HKCU "${PDFTOOL_SFA}\.pdf\shell\PdfToolMerge"
+    DeleteRegKey HKCU "${PDFTOOL_SFA}\.pdf\shell\PdfToolCompress"
     DeleteRegKey HKCU "${PDFTOOL_SFA}\.hwp\shell\PdfToolHwp2Pdf"
     DeleteRegKey HKCU "${PDFTOOL_SFA}\.hwp\shell\PdfToolHwpMerge"
     DeleteRegKey HKCU "${PDFTOOL_SFA}\.hwp\shell\PdfToolHwp2Hwpx"
