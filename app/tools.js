@@ -43,6 +43,7 @@ export function initTools(ctx) {
       await onOpen(st, token);
     }
     st.open = open;
+    if (ctx.openers) ctx.openers[p] = open;
     dropZone($(`#${p}Drop`), (files) => open(files[0]));
     $(`#${p}Open`).onclick = async () => { const [f] = await api.pickPdfs(false); if (f) open(f); };
     return st;

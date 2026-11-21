@@ -262,6 +262,7 @@ export function initEdit(ctx) {
 
   document.querySelectorAll('#dModes button').forEach((b) => { b.onclick = () => setMode(b.dataset.m); });
   $('#dOpen').onclick = async () => { const [f] = await api.pickPdfs(false); if (f) open(f); };
+  if (ctx.openers) ctx.openers.d = open;
   dropZone($('#dDrop'), (files) => open(files[0]));
   $('#dPrev').onclick = () => { if (E.page > 0) { E.page--; draw(); } };
   $('#dNext').onclick = () => { if (E.page < E.pages - 1) { E.page++; draw(); } };

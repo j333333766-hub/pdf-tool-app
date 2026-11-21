@@ -14,6 +14,8 @@ static const CLSID kIds[] = {
     { 0xA6FA80FF, 0xD4D9, 0x4F58, { 0x83, 0x8B, 0xCF, 0xB5, 0xD8, 0x8A, 0x61, 0x3C } },
     { 0x640235A8, 0xA313, 0x4ADF, { 0x84, 0x6C, 0xF6, 0xFC, 0xDA, 0x51, 0x3A, 0xC1 } },
     { 0x6233F6F7, 0xCD41, 0x403E, { 0x88, 0xE0, 0x59, 0xA2, 0xF2, 0x2E, 0x77, 0x7F } },
+    { 0x43F6F2BA, 0xA25A, 0x4A70, { 0x9A, 0xCE, 0x07, 0x3A, 0xE7, 0x9B, 0x25, 0xA4 } },
+    { 0xF380260B, 0xC26A, 0x481A, { 0x8F, 0xE6, 0x53, 0x13, 0xA9, 0x4C, 0x1B, 0x26 } },
 };
 
 int wmain(int argc, wchar_t** argv) {
@@ -29,7 +31,7 @@ int wmain(int argc, wchar_t** argv) {
     IShellItemArray* arr = nullptr;
     HRESULT hr = SHCreateShellItemArrayFromIDLists((UINT)pidls.size(), (PCIDLIST_ABSOLUTE_ARRAY)pidls.data(), &arr);
     if (FAILED(hr)) { printf("item array 실패 %08lx\n", hr); return 1; }
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < (int)ARRAYSIZE(kIds); k++) {
         IExplorerCommand* cmd = nullptr;
         hr = CoCreateInstance(kIds[k], nullptr, CLSCTX_LOCAL_SERVER | CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&cmd));
         if (FAILED(hr)) { printf("[%d] 만들기 실패 %08lx\n", k, hr); continue; }

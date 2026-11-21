@@ -7,18 +7,19 @@ const hwp = require('./hwp');
 const shellmenu = require('./shellmenu');
 const pdfedit = require('./pdfedit');
 
-// --merge a.pdf b.pdf  /  --split a.pdf  /  --sign a.pdf  /  a.pdf(그냥 열기 = 서명 화면)
+// --view a.pdf  /  --merge a.pdf b.pdf  /  --split a.pdf  /  --sign a.pdf  /  a.pdf(그냥 열기 = 보기 화면)
 // --hwp2pdf a.hwp b.hwpx (PDF로 변환)  /  --hwpmerge a.hwp b.hwpx (PDF로 변환해서 합치기)  /  --hwp2hwpx a.hwp (HWPX로 변환)
+// --hwp2hwpx-del a.hwp (HWPX로 변환하고 원본 hwp는 휴지통으로)
 function parseArgs(argv) {
   // 두 번째 실행에서 넘어온 argv는 Chromium이 스위치를 앞으로 옮겨 순서가 바뀌므로 자르지 말고 전부 훑는다
   const args = argv.slice(1);
   let mode = null;
   const files = [];
   for (const a of args) {
-    if (['--merge', '--split', '--sign', '--hwp2pdf', '--hwpmerge', '--hwp2hwpx'].includes(a)) mode = a.slice(2);
+    if (['--view', '--merge', '--split', '--sign', '--hwp2pdf', '--hwpmerge', '--hwp2hwpx', '--hwp2hwpx-del'].includes(a)) mode = a.slice(2);
     else if (/\.(pdf|hwpx?)$/i.test(a) && fs.existsSync(a)) files.push(path.resolve(a));
   }
-  if (files.length && !mode) mode = files.every((f) => hwp.HWP_RE.test(f)) ? 'hwp2pdf' : 'sign';
+  if (files.length && !mode) mode = files.every((f) => hwp.HWP_RE.test(f)) ? 'hwp2pdf' : 'view';
   return { mode, files };
 }
 
@@ -68,7 +69,8 @@ function start() {
     title: 'PDF 도구',
     icon: path.join(__dirname, 'icon.png'),
     backgroundColor: '#f4f5f7',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false },
+    // backgroundThrottling: 다른 창을 보는 동안에도 용량 줄이기·그림 변환·보기 화면 그리기가 멈추지 않게
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false, backgroundThrottling: false },
   });
   win.loadFile(path.join(__dirname, 'index.html'));
   // 편집하던 PDF를 저장하지 않고 닫으려 하면 묻는다
@@ -192,13 +194,32 @@ ipcMain.handle('roster-sample', async () => {
 });
 ipcMain.handle('sign', wrap((_e, file, stamps, out) => core.sign(file, stamps.map((s) => ({ ...s, png: Buffer.from(s.png) })), out)));
 // 한글 → PDF·HWPX. toTemp면 합치기용 임시 폴더에, 아니면 원본 옆에 만든다
-ipcMain.handle('hwp-convert', wrap(async (e, files, toTemp, format = 'PDF') => {
+// delSrc: HWPX로 바꾼 뒤 원본 hwp를 휴지통으로 보낸다 (새 파일이 제대로 생긴 것만)
+ipcMain.handle('hwp-convert', wrap(async (e, files, toTemp, format = 'PDF', delSrc = false) => {
   let outDir = null;
   if (toTemp) {
     outDir = path.join(hwpTmpRoot(), String(Date.now()));
     await fs.promises.mkdir(outDir, { recursive: true });
   }
-  return hwp.convert(app, files, { format, outDir, onProgress: (p) => e.sender.send('hwp-progress', p) });
+  const results = await hwp.convert(app, files, { format, outDir, onProgress: (p) => e.sender.send('hwp-progress', p) });
+  if (delSrc && format === 'HWPX' && !toTemp) {
+    for (const r of results) {
+      if (!r.out || r.error) continue;
+      try {
+        const st = fs.statSync(r.out);
+        // HWPX는 ZIP — 첫 4바이트가 PK가 아니면 원본을 남긴다
+        const fd = fs.openSync(r.out, 'r');
+        const b = Buffer.alloc(4);
+        try { fs.readSync(fd, b, 0, 4, 0); } finally { fs.closeSync(fd); }
+        if (!st.size || b.readUInt32BE(0) !== 0x504b0304) throw new Error('새 HWPX 파일을 확인하지 못해 원본을 남겼습니다');
+        await shell.trashItem(r.src);
+        r.trashed = true;
+      } catch (err) {
+        r.trashError = err.message || '원본을 지우지 못했습니다';
+      }
+    }
+  }
+  return results;
 }));
 ipcMain.handle('hwp-cancel', () => hwp.cancel());
 ipcMain.handle('pick-hwps', async () => {
@@ -207,6 +228,49 @@ ipcMain.handle('pick-hwps', async () => {
 });
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
+// PDF 안의 인터넷 링크 — 웹 주소와 메일 주소만 연다
+ipcMain.handle('open-external', async (_e, url) => {
+  if (!/^(https?:|mailto:)/i.test(String(url))) return false;
+  await shell.openExternal(String(url));
+  return true;
+});
+
+// 보기 화면 인쇄 — 쪽 그림(150dpi)을 숨은 창에 한 장씩 놓고 윈도우 인쇄 창을 띄운다
+ipcMain.handle('print-images', wrap(async (_e, pages, title) => {
+  const dir = path.join(app.getPath('temp'), `pdftool-print-${Date.now()}`);
+  await fs.promises.mkdir(dir, { recursive: true });
+  try {
+    const body = [];
+    for (const [i, pg] of pages.entries()) {
+      await fs.promises.writeFile(path.join(dir, `${i}.jpg`), Buffer.from(pg.bytes));
+      body.push(`<div class="pg${pg.w > pg.h ? ' land' : ''}"><img src="${i}.jpg"></div>`);
+    }
+    const esc = String(title || 'PDF').replace(/[<>&"]/g, '');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc}</title><style>
+@page { size: A4 portrait; margin: 0 } @page land { size: A4 landscape; margin: 0 }
+html, body { margin: 0; padding: 0; }
+.pg { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; break-after: page; }
+.pg.land { page: land; }
+.pg:last-child { break-after: auto; }
+.pg img { max-width: 100%; max-height: 100%; }
+</style></head><body>${body.join('')}</body></html>`;
+    await fs.promises.writeFile(path.join(dir, 'print.html'), html);
+    const pw = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+    try {
+      await pw.loadFile(path.join(dir, 'print.html'));
+      if (process.env.PDFTOOL_PRINT_TEST) {
+        await fs.promises.writeFile(process.env.PDFTOOL_PRINT_TEST, await pw.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true }));
+        return true;
+      }
+      await new Promise((resolve, reject) => pw.webContents.print({ silent: false, printBackground: true }, (ok, reason) => {
+        if (ok || /cancel/i.test(String(reason))) resolve(); else reject(new Error(reason));
+      }));
+    } finally { pw.destroy(); }
+    return true;
+  } finally {
+    fs.rm(dir, { recursive: true, force: true }, () => {});
+  }
+}));
 
 // 저장해 둔 서명 (PNG)
 ipcMain.handle('sig-list', async () => {

@@ -202,3 +202,66 @@ nav.side .group { color: #8b919e; font-size: 11.5px; font-weight: 700; margin: 1
 #tab-edit .stage-inner { user-select: none; }
 .notice summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
 .notice pre { white-space: pre-wrap; font-size: 11.5px; max-height: 220px; overflow: auto; background: #f6f7f9; padding: 8px; border-radius: 6px; }
+
+/* PDF 보기 */
+.vbar { flex-wrap: wrap; row-gap: 6px; }
+.vbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }
+.vbar button { padding: 5px 10px; }
+.vbar .seg { margin-left: 0; }
+#vSideBtn.on { background: var(--sel); color: var(--accent-d); border-color: #f3c4bf; }
+#vPage { width: 52px; text-align: center; padding: 5px 4px; }
+#vPct { min-width: 38px; }
+#tab-view:not(.has-doc) .needs-doc { opacity: .45; pointer-events: none; }
+.vsearch { display: flex; align-items: center; gap: 4px; }
+.vsearch input { width: 190px; padding: 5px 8px; }
+.vsearch input.miss { background: #fff0ee; border-color: #f3c4bf; }
+.vsearch button { padding: 4px 8px; }
+#vFindInfo { min-width: 70px; }
+.view-body { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.vside { width: 178px; flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.vside .seg { margin: 8px; display: flex; }
+.vside .seg button { flex: 1; padding: 5px 4px; font-size: 13px; }
+.vthumbs, .voutline { flex: 1; overflow: auto; padding: 2px 8px 12px; }
+.vthumb { padding: 6px 4px; border-radius: 6px; cursor: pointer; text-align: center; border: 2px solid transparent; }
+.vthumb:hover { background: #f1f2f4; }
+.vthumb.cur { border-color: var(--accent); background: var(--sel); }
+.vthumb canvas, .vthumb .ph { width: 110px; display: block; margin: 0 auto; box-shadow: 0 1px 4px rgba(0,0,0,.25); background: #fff; }
+.vthumb .ph { background: #eee; }
+.vthumb .pn { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.vthumb.cur .pn { color: var(--accent-d); font-weight: 700; }
+.voutline ul { list-style: none; margin: 0; padding-left: 12px; }
+.voutline > ul { padding-left: 0; }
+.ol-row { display: flex; align-items: flex-start; }
+.ol-row button { border: 0; background: transparent; border-radius: 4px; }
+.ol-row .car { width: 18px; padding: 3px 0; flex: none; color: var(--muted); font-size: 11px; }
+.ol-row .car.none { visibility: hidden; }
+.ol-row .ttl { flex: 1; min-width: 0; text-align: left; padding: 3px 4px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.ol-row .ttl:hover { background: #f0f1f4; color: var(--accent-d); }
+.vscroll { background: #e6e8ec; border-style: solid; border-width: 1px; outline: none; }
+.vpages { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px; width: max-content; min-width: 100%; }
+.vrow { display: flex; gap: 14px; align-items: flex-start; }
+.vpage { position: relative; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); flex: none; overflow: hidden; }
+.vpage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vlinks { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.vlink { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 2px; }
+.vlink:hover { background: rgba(37,99,235,.12); outline: 1px solid rgba(37,99,235,.45); }
+.vscroll.fs { background: #15171c; border: 0; border-radius: 0; }
+.vscroll.fs .vpages { padding: 4px; }
+.vrecent { pointer-events: auto; margin-top: 18px; width: min(620px, 92%); text-align: left; }
+.vrecent h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.vrecent button { display: block; width: 100%; text-align: left; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrecent small { color: var(--muted); }
+.gap6 { gap: 6px; }
+.err-text { color: var(--accent-d) !important; }
+/* pdf.js 글자 층 (pdf.js 4.10 viewer.css에서 필요한 부분만) */
+.textLayer { position: absolute; text-align: initial; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 2; }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.textLayer span.markedContent { top: 0; height: 0; }
+.textLayer ::selection { background: rgba(0, 90, 255, .28); }
+.textLayer br::selection { background: transparent; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
+.textLayer span.hl { position: static; background: rgba(255, 196, 0, .45); border-radius: 2px; margin: -1px; padding: 1px; }
+.textLayer span.hl.sel { background: rgba(255, 110, 0, .6); }
+#tab-view .filename { max-width: 340px; min-width: 0; flex: 0 1 auto; }
+#tab-view .toolbar .vsearch input { width: 170px; }

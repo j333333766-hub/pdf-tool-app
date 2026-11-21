@@ -14,6 +14,8 @@
 </header>
 <div class="body">
 <nav class="side">
+  <div class="group">보기</div>
+  <button class="tab" data-tab="view">PDF 보기</button>
   <div class="group">합치기 · 나누기</div>
   <button class="tab active" data-tab="merge">합치기</button>
   <button class="tab" data-tab="split">나누기</button>
@@ -31,6 +33,71 @@
   <button class="tab" data-tab="toimage">PDF → 그림</button>
   <button class="tab" data-tab="hwp">한글 변환</button>
 </nav>
+
+<!-- PDF 보기 -->
+<section id="tab-view" class="panel">
+  <div class="toolbar">
+    <button id="vOpen" class="primary" title="Ctrl+O">PDF 열기</button>
+    <span id="vName" class="filename"></span>
+    <span class="spacer"></span>
+    <div class="vsearch">
+      <input id="vFind" type="search" placeholder="글자 찾기 (Ctrl+F)">
+      <button id="vFindPrev" class="needs-doc" title="이전 (Shift+Enter)">▲</button>
+      <button id="vFindNext" class="needs-doc" title="다음 (Enter, F3)">▼</button>
+      <span id="vFindInfo" class="muted small"></span>
+    </div>
+    <select id="vSendTo" class="needs-doc" title="지금 보는 PDF를 다른 화면으로 넘깁니다">
+      <option value="">이 PDF로 작업하기…</option>
+      <option value="split">나누기</option><option value="organize">쪽 정리</option><option value="rotate">쪽 회전</option>
+      <option value="unspread">두 쪽 → 한 쪽씩</option><option value="crop">영역 자르기</option><option value="edit">글자 · 그림 편집</option>
+      <option value="sign">서명 넣기</option><option value="stamp">쪽번호 · 워터마크</option><option value="compress">용량 줄이기</option>
+      <option value="toimage">PDF → 그림</option><option value="merge">합치기에 넣기</option>
+      <option value="external">다른 프로그램으로 열기</option>
+    </select>
+    <button id="vPrint" class="needs-doc" title="Ctrl+P">인쇄</button>
+  </div>
+  <div class="toolbar vbar">
+    <button id="vSideBtn" class="on" title="축소판 · 책갈피 (F4)">☰</button>
+    <span class="sep"></span>
+    <button id="vPrev" class="needs-doc" title="이전 쪽 (←)">◀</button>
+    <input id="vPage" type="text" class="needs-doc" title="쪽 번호를 쓰고 Enter"><span id="vTotal" class="muted">/ 0</span>
+    <button id="vNext" class="needs-doc" title="다음 쪽 (→)">▶</button>
+    <span class="sep"></span>
+    <button id="vZoomOut" class="needs-doc" title="축소 (Ctrl+-, Ctrl+휠)">－</button>
+    <select id="vZoom" class="needs-doc">
+      <option value="width">폭 맞춤</option><option value="page">쪽 맞춤</option>
+      <option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option>
+      <option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option><option value="4">400%</option>
+      <option value="custom" id="vZoomCustom" hidden></option>
+    </select>
+    <button id="vZoomIn" class="needs-doc" title="확대 (Ctrl++, Ctrl+휠)">＋</button>
+    <span id="vPct" class="muted small"></span>
+    <span class="sep"></span>
+    <div class="seg" id="vSpread">
+      <button data-s="1" class="on" title="한 쪽씩 이어서 보기">한 쪽</button>
+      <button data-s="2" title="두 쪽씩 나란히">두 쪽</button>
+      <button data-s="2c" title="첫 쪽(표지)은 혼자, 그다음부터 두 쪽씩 — 책처럼">책 보기</button>
+    </div>
+    <button id="vRotL" class="needs-doc" title="왼쪽으로 돌려 보기 (파일은 바뀌지 않음)">↺</button>
+    <button id="vRotR" class="needs-doc" title="오른쪽으로 돌려 보기 (파일은 바뀌지 않음)">↻</button>
+    <button id="vFull" class="needs-doc" title="전체 화면 (F5, 나가기 Esc)">전체 화면</button>
+  </div>
+  <div class="view-body">
+    <aside id="vSide" class="vside">
+      <div class="seg" id="vSideTabs"><button data-v="thumbs" class="on">축소판</button><button data-v="outline">책갈피</button></div>
+      <div id="vThumbs" class="vthumbs"></div>
+      <div id="vOutline" class="voutline hidden"></div>
+    </aside>
+    <div id="vDrop" class="drop vscroll" tabindex="0">
+      <div id="vPages" class="vpages"></div>
+      <div class="empty" id="vEmpty">
+        <p class="big-text">볼 PDF를 끌어다 놓거나 'PDF 열기'를 누르세요</p>
+        <p class="muted">글자를 끌어서 고르고 복사할 수 있습니다. 다시 열면 마지막에 보던 쪽부터 보여 줍니다.</p>
+        <div id="vRecent" class="vrecent"></div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- 합치기 -->
 <section id="tab-merge" class="panel active">
@@ -371,16 +438,17 @@
     <button id="hRun" class="primary big" disabled>PDF로 변환</button>
     <button id="hMerge" class="big" disabled>PDF로 변환해서 합치기</button>
     <button id="hHwpx" class="big" disabled title="hwp 문서만 바꿉니다">HWPX로 변환</button>
+    <label class="muted small" title="새 HWPX 파일이 제대로 만들어진 문서만 원본 hwp를 휴지통으로 보냅니다"><input type="checkbox" id="hDelSrc"> 원본 hwp 삭제(휴지통)</label>
   </div>
   <div id="hDrop" class="drop">
     <ol id="hList" class="filelist hwplist"></ol>
     <div class="empty" id="hEmpty">
       <p class="big-text">한글 문서(hwp, hwpx)를 여기에 끌어다 놓으세요</p>
-      <p class="muted">파일 탐색기에서 여러 한글 문서를 고른 뒤 오른쪽 클릭 → <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b>(hwp만)으로도 열 수 있습니다.<br>
+      <p class="muted">파일 탐색기에서 여러 한글 문서를 고른 뒤 오른쪽 클릭 → <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b>, <b>HWPX로 변환 (원본 삭제)</b>(hwp만)으로도 열 수 있습니다.<br>
       (윈도우 11은 오른쪽 클릭 후 <b>추가 옵션 표시</b> 안에 있습니다)</p>
     </div>
   </div>
-  <p class="hint">PDF·HWPX는 원본과 같은 폴더에 같은 이름으로 만들고 원본은 그대로 둡니다(이미 있으면 <code>이름 (1).pdf</code>). 이 컴퓨터에 한글 프로그램이 설치되어 있어야 합니다. 암호가 걸린 문서는 바꿀 수 없습니다.</p>
+  <p class="hint">PDF·HWPX는 원본과 같은 폴더에 같은 이름으로 만들고 원본은 그대로 둡니다(이미 있으면 <code>이름 (1).pdf</code>). 'HWPX로 변환 (원본 삭제)'나 '원본 hwp 삭제'를 고르면 변환에 성공한 원본만 휴지통으로 보냅니다(휴지통에서 되살릴 수 있음). 이 컴퓨터에 한글 프로그램이 설치되어 있어야 합니다. 암호가 걸린 문서는 바꿀 수 없습니다.</p>
 </section>
 
 </div>
@@ -406,7 +474,7 @@
   <div class="modal-box narrow">
     <h3>설정</h3>
     <label><input type="checkbox" id="ctxToggle"> 파일 탐색기 오른쪽 클릭 메뉴 보이기<br>
-      <span class="muted small">PDF: <b>PDF 합치기</b> · 한글 문서: <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b></span></label>
+      <span class="muted small">PDF: <b>PDF 도구로 보기</b>, <b>PDF 합치기</b> · 한글 문서: <b>PDF로 변환</b>, <b>PDF로 변환해서 합치기</b>, <b>HWPX로 변환</b>, <b>HWPX로 변환 (원본 삭제)</b></span></label>
     <p id="ctxNote" class="muted small"></p>
     <label><input type="checkbox" id="m11Toggle"> 윈도우 11 오른쪽 클릭 <b>첫 화면</b>에 바로 보이기</label>
     <p id="m11Note" class="muted small"></p>
@@ -414,6 +482,16 @@
     <p class="muted small" id="verInfo"></p>
     <details class="notice"><summary>오픈 소스 고지 (AGPL)</summary><pre id="noticeText"></pre></details>
     <div class="right"><button id="setClose" class="primary">닫기</button></div>
+  </div>
+</div>
+
+<!-- PDF 암호 -->
+<div id="pwModal" class="modal hidden">
+  <div class="modal-box narrow">
+    <h3>암호가 걸린 PDF</h3>
+    <p id="pwMsg" class="muted small"></p>
+    <input id="pwInput" type="password" class="wide" autocomplete="off">
+    <div class="right gap6"><button id="pwCancel">취소</button><button id="pwOk" class="primary">열기</button></div>
   </div>
 </div>
 

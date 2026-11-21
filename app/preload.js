@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('api', {
   editImageSize: call('edit-image-size'),
   showInFolder: call('show-in-folder'),
   openPath: call('open-path'),
+  openExternal: call('open-external'),
+  printImages: call('print-images'),
   sigList: call('sig-list'),
   sigSave: call('sig-save'),
   sigDelete: call('sig-delete'),

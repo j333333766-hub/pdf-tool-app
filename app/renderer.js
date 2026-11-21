@@ -1,6 +1,7 @@
 import * as pdfjsLib from './vendor/pdf.min.mjs';
 import { initTools } from './tools.js';
 import { initEdit } from './edit-ui.js';
+import { initViewer } from './viewer.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.mjs';
 
@@ -708,12 +709,12 @@ let hwpChain = Promise.resolve();
 let hwpCancelGen = 0;
 let hwpListener = null;
 api.onHwpProgress((p) => { if (hwpListener) hwpListener(p); });
-function convertQueued(files, toTemp, onProgress, format = 'PDF') {
+function convertQueued(files, toTemp, onProgress, format = 'PDF', delSrc = false) {
   const gen = hwpCancelGen;
   const run = hwpChain.then(async () => {
     if (gen !== hwpCancelGen) return { ok: true, value: files.map((src) => ({ src, error: '사용자가 중지함' })) };
     hwpListener = onProgress;
-    try { return await api.hwpConvert(files, toTemp, format); } finally { hwpListener = null; }
+    try { return await api.hwpConvert(files, toTemp, format, delSrc); } finally { hwpListener = null; }
   });
   hwpChain = run.catch(() => {});
   return run;
@@ -737,7 +738,8 @@ function renderHwp() {
     if (it.state === 'err') li.classList.add('err');
     li.innerHTML = `<span class="no">${i + 1}</span><span class="nm"><b></b><span></span></span><span class="chip ${it.state}"></span><span class="acts"></span>`;
     li.querySelector('.nm b').textContent = baseName(it.path);
-    li.querySelector('.nm span').textContent = it.state === 'err' ? it.error : it.state === 'ok' ? `→ ${baseName(it.out)}` : dirName(it.path);
+    li.querySelector('.nm span').textContent = it.state === 'err' ? it.error
+      : it.state === 'ok' ? `→ ${baseName(it.out)}${it.trashed ? ' · 원본은 휴지통으로' : it.trashError ? ` · ${it.trashError}` : ''}` : dirName(it.path);
     li.querySelector('.chip').textContent = HW_CHIP[it.state];
     const acts = li.querySelector('.acts');
     if (it.state === 'ok') {
@@ -758,11 +760,11 @@ function renderHwp() {
       : todo ? `${hw.items.length}개 문서` : `완료 ${ok}개${bad ? ` · 실패 ${bad}개` : ''}`;
   $('#hRun').disabled = $('#hMerge').disabled = hw.running || !todo;
   $('#hHwpx').disabled = hw.running || !hw.items.some((i) => i.state === 'wait' && /\.hwp$/i.test(i.path));
-  $('#hAdd').disabled = $('#hClear').disabled = hw.running;
+  $('#hAdd').disabled = $('#hClear').disabled = $('#hDelSrc').disabled = hw.running;
   $('#hStop').classList.toggle('hidden', !hw.running);
 }
 
-async function runHwp(format = 'PDF') {
+async function runHwp(format = 'PDF', delSrc = false) {
   const todo = hw.items.filter((i) => i.state === 'wait');
   if (!todo.length) return;
   todo.forEach((i) => { i.state = 'queue'; });
@@ -775,14 +777,14 @@ async function runHwp(format = 'PDF') {
     if (p.out) it.out = p.out;
     if (p.error) it.error = p.error;
     renderHwp();
-  }, format);
+  }, format, delSrc);
   hw.running--;
   if (!r.ok) {
     todo.forEach((i) => { if (i.state !== 'ok') Object.assign(i, { state: 'err', error: r.error }); });
     renderHwp();
     return toast(r.error, { err: true });
   }
-  r.value.forEach((x, k) => Object.assign(todo[k], x.out ? { state: 'ok', out: x.out } : { state: 'err', error: x.error }));
+  r.value.forEach((x, k) => Object.assign(todo[k], x.out ? { state: 'ok', out: x.out, trashed: !!x.trashed, trashError: x.trashError } : { state: 'err', error: x.error }));
   renderHwp();
   // 뒤에 기다리는 묶음이 있으면 다 끝난 뒤 한 번만 알린다
   if (hw.running) return;
@@ -790,14 +792,16 @@ async function runHwp(format = 'PDF') {
   const ok = finished.filter((i) => i.state === 'ok');
   const bad = finished.length - ok.length;
   if (!ok.length) return toast(`변환하지 못했습니다: ${finished[0].error}`, { err: true });
-  toast(`파일 ${ok.length}개를 만들었습니다${bad ? ` (실패 ${bad}개)` : ''}.`, { err: bad > 0, actions: [['폴더 보기', () => api.showInFolder(ok[0].out)]] });
+  const trashed = ok.filter((i) => i.trashed).length;
+  const kept = ok.filter((i) => i.trashError).length;
+  toast(`파일 ${ok.length}개를 만들었습니다${trashed ? ` · 원본 ${trashed}개는 휴지통으로` : ''}${kept ? ` · 원본 ${kept}개는 남김` : ''}${bad ? ` (실패 ${bad}개)` : ''}.`, { err: bad > 0, actions: [['폴더 보기', () => api.showInFolder(ok[0].out)]] });
 }
 
 dropZone($('#hDrop'), addToHwp, { accept: HWP_RE, wrong: '한글 문서(hwp, hwpx)만 넣을 수 있습니다.' });
 $('#hAdd').onclick = async () => addToHwp(await api.pickHwps());
 $('#hClear').onclick = () => { hw.items = []; renderHwp(); };
 $('#hRun').onclick = () => runHwp('PDF');
-$('#hHwpx').onclick = () => runHwp('HWPX');
+$('#hHwpx').onclick = () => runHwp('HWPX', $('#hDelSrc').checked);
 $('#hStop').onclick = () => { hwpCancelGen++; api.hwpCancel(); $('#hSummary').textContent = '지금 문서까지만 바꾸고 멈춥니다…'; };
 $('#hMerge').onclick = async () => {
   const paths = hw.items.filter((i) => i.state === 'wait').map((i) => i.path);
@@ -855,24 +859,41 @@ api.onOpenFiles(({ mode, files }) => {
   if (mode === 'merge') {
     showTab('merge');
     addToMerge(files.slice().sort(byName), { fromShell: true });
-  } else if (mode === 'hwp2pdf' || mode === 'hwp2hwpx') {
+  } else if (mode === 'hwp2pdf' || mode === 'hwp2hwpx' || mode === 'hwp2hwpx-del') {
+    const toHwpx = mode !== 'hwp2pdf';
     showTab('hwp');
-    addToHwp(files.filter((f) => (mode === 'hwp2hwpx' ? /\.hwp$/i : HWP_RE).test(f)));
-    runHwp(mode === 'hwp2hwpx' ? 'HWPX' : 'PDF');
+    addToHwp(files.filter((f) => (toHwpx ? /\.hwp$/i : HWP_RE).test(f)));
+    runHwp(toHwpx ? 'HWPX' : 'PDF', mode === 'hwp2hwpx-del');
   } else if (mode === 'hwpmerge') {
     showTab('merge');
     addAnyToMerge(files, { fromShell: true });
   } else if (mode === 'split') {
     showTab('split');
     openSplit(files[0]);
-  } else {
+  } else if (mode === 'sign') {
     showTab('sign');
     openSign(files[0]);
+  } else {
+    showTab('view');
+    viewer.open(files[0]);
   }
 });
 
-initTools({ $, api, toast, savedToast, busy, openPdfJs, pdfjsErrorText, dropZone, baseName, dirName, collator });
-initEdit({ $, api, toast, savedToast, busy, dropZone, baseName, dirName });
+// 보기 화면의 '이 PDF로 작업하기' — 다른 화면으로 파일을 넘긴다
+const openers = {};
+const PREFIX_TAB = { o: 'organize', r: 'rotate', u: 'unspread', c: 'crop', t: 'stamp', z: 'compress', i: 'toimage', d: 'edit' };
+function openIn(tab, file) {
+  showTab(tab);
+  if (tab === 'merge') return addToMerge([file]);
+  if (tab === 'split') return openSplit(file);
+  if (tab === 'sign') return openSign(file);
+  const pre = Object.keys(PREFIX_TAB).find((k) => PREFIX_TAB[k] === tab);
+  if (pre && openers[pre]) openers[pre](file);
+}
+
+initTools({ $, api, toast, savedToast, busy, openPdfJs, pdfjsErrorText, dropZone, baseName, dirName, collator, openers });
+initEdit({ $, api, toast, savedToast, busy, dropZone, baseName, dirName, openers });
+const viewer = initViewer({ $, api, toast, busy, pdfjsLib, dropZone, baseName, dirName, openIn });
 
 let info = { packaged: false };
 renderMerge();
