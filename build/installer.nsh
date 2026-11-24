@@ -15,10 +15,30 @@
   Pop $0
 !macroend
 
-; 설치 직후 첫 화면 메뉴 등록 — 사용자가 설정에서 끈 경우는 건너뜀. 서명 패키지가 안 되면 개발자 모드 등록, 그것도 안 되면 앱 설정에서 켜기.
+; 설치 직후 첫 화면 메뉴 등록 (build/shellmenu/register.ps1 — 끝 코드 0 등록 / 2 설정에서 끔 / 3 관리자 권한 필요 / 4 실패)
+;   개발자 모드가 아닌 PC는 서명 인증서를 처음 한 번 관리자 권한으로 등록해야 한다(1.7.1까지는 여기서 조용히 실패했음).
+;   등록되면 탐색기를 다시 시작해야 메뉴가 보인다(켜져 있던 탐색기는 지웠다 다시 넣은 패키지를 모름).
+!define PDFTOOL_REG `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\shellmenu\register.ps1" -InstallDir "$INSTDIR"`
 !macro PdfToolRegisterShellMenu
-  nsExec::Exec `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$$s = Join-Path $$env:APPDATA 'PDF 도구\settings.json'; if ((Test-Path $$s) -and ((Get-Content $$s -Raw -Encoding UTF8 | ConvertFrom-Json).shellMenu -eq $$false)) { exit }; $$d = '$INSTDIR'; try { Add-AppxPackage -Path (Join-Path $$d 'resources\shellmenu\PdfToolShellMenu.msix') -ExternalLocation $$d -ForceUpdateFromAnyVersion -ErrorAction Stop } catch { Add-AppxPackage -Register (Join-Path $$d 'resources\shellmenu\AppxManifest.xml') -ExternalLocation $$d -ForceUpdateFromAnyVersion -ErrorAction SilentlyContinue }"`
+  nsExec::Exec `${PDFTOOL_REG}`
   Pop $0
+  ${If} $0 == 3
+  ${AndIfNot} ${Silent}
+    MessageBox MB_YESNO|MB_ICONINFORMATION "파일 탐색기 오른쪽 클릭 '첫 화면'에 PDF 도구 메뉴를 보이려면$\r$\n처음 한 번 관리자 권한이 필요합니다(메뉴 서명 인증서 등록).$\r$\n$\r$\n지금 등록할까요? 다음에 뜨는 확인 창에서 '예'를 누르세요.$\r$\n$\r$\n(건너뛰어도 Shift+오른쪽 클릭, 또는 오른쪽 클릭 → '추가 옵션 표시'에서$\r$\n메뉴를 쓸 수 있고, 나중에 PDF 도구 → 설정에서 켤 수도 있습니다.)" IDNO pdftool_admin_skip
+    nsExec::Exec `${PDFTOOL_REG} -Elevate`
+    Pop $0
+    pdftool_admin_skip:
+  ${EndIf}
+  ${IfNot} ${Silent}
+    ${If} $0 == 0
+      MessageBox MB_YESNO|MB_ICONQUESTION "오른쪽 클릭 첫 화면 메뉴를 등록했습니다.$\r$\n파일 탐색기를 다시 시작해야 메뉴가 보입니다. 지금 다시 시작할까요?$\r$\n(열려 있는 폴더 창은 닫힙니다. '아니요'를 고르면 다음에 로그인할 때부터 보입니다.)" IDNO pdftool_restart_skip
+      nsExec::Exec `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3; if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }"`
+      Pop $1
+      pdftool_restart_skip:
+    ${ElseIf} $0 != 2
+      MessageBox MB_OK|MB_ICONINFORMATION "오른쪽 클릭 첫 화면 메뉴는 켜지 못했습니다.$\r$\n$\r$\nPDF 도구 메뉴는 Shift+오른쪽 클릭, 또는 오른쪽 클릭 → '추가 옵션 표시'에 있습니다.$\r$\n(관리자 계정이 있으면 PDF 도구 → 설정 → '관리자 권한으로 켜기'로 첫 화면에도 보이게 할 수 있습니다.)"
+    ${EndIf}
+  ${EndIf}
 !macroend
 
 !macro customInit

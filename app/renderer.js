@@ -816,7 +816,7 @@ $('#btnSettings').onclick = async () => {
   $('#setModal').classList.remove('hidden');
   $('#ctxToggle').checked = await api.ctxStatus();
   $('#ctxNote').textContent = info.packaged
-    ? '윈도우 11에서는 오른쪽 클릭 → "추가 옵션 표시"(Shift+F10) 안에 나타납니다.'
+    ? '윈도우 11에서는 Shift+오른쪽 클릭, 또는 오른쪽 클릭 → "추가 옵션 표시" 안에 나타납니다.'
     : '개발 실행 중에는 바꿀 수 없습니다. 설치한 프로그램에서 바꾸세요.';
   $('#ctxToggle').disabled = !info.packaged;
   refreshMenu11();
@@ -837,7 +837,12 @@ async function setMenu11(on, admin = false) {
   $('#m11Toggle').disabled = true;
   $('#m11Note').textContent = on ? '등록하는 중… (몇 초 걸립니다)' : '끄는 중…';
   const r = await api.menu11Set(on, admin);
-  if (r.ok) return refreshMenu11();
+  if (r.ok) {
+    await refreshMenu11();
+    toast(`${on ? '켰습니다' : '껐습니다'}. 파일 탐색기를 다시 시작하면 오른쪽 클릭 첫 화면에 반영됩니다(열린 폴더 창은 닫힘).`,
+      { actions: [['탐색기 다시 시작', () => api.menu11RestartExplorer()]] });
+    return;
+  }
   await refreshMenu11(r.needAdmin
     ? '이 컴퓨터에서는 처음 한 번 관리자 권한이 필요합니다(메뉴 서명 인증서 등록). 아래 단추를 누르고 "예"를 고르세요.'
     : `켜지 못했습니다: ${r.error}`);
@@ -855,6 +860,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ───── 시작 ─────
+// 첫 화면 메뉴를 못 켠 PC(관리자 권한 필요 등) — 버전마다 한 번 안내
+api.onMenu11Hint(() => toast('오른쪽 클릭 메뉴는 Shift+오른쪽 클릭(또는 오른쪽 클릭 → "추가 옵션 표시")에 있습니다. 첫 화면에도 보이게 하려면 설정에서 켜세요.',
+  { actions: [['설정 열기', () => $('#btnSettings').click()]] }));
 api.onOpenFiles(({ mode, files }) => {
   if (mode === 'merge') {
     showTab('merge');

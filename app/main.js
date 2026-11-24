@@ -28,6 +28,12 @@ const pending = { mode: null, files: [] };
 let flushTimer = null;
 let win = null;
 let rendererReady = false;
+let menu11HintPending = false;
+function flushMenu11Hint() {
+  if (!menu11HintPending || !rendererReady || !win) return;
+  menu11HintPending = false;
+  win.webContents.send('menu11-hint');
+}
 
 function queue({ mode, files }) {
   if (!files.length) return;
@@ -97,7 +103,15 @@ function start() {
   if (app.isPackaged) {
     registry.isRegistered(process.execPath).then((ok) => { if (!ok) registry.register(process.execPath); });
     // 윈도우 11 첫 화면 메뉴도 (끄지 않았으면) 지금 버전으로 맞춘다
-    shellmenu.sync(app, settings().shellMenu !== false).catch(() => {});
+    // 끝내 못 켰으면(관리자 권한 필요 등) 버전마다 한 번 'Shift+오른쪽 클릭' 안내
+    shellmenu.sync(app, settings().shellMenu !== false).then((s) => {
+      const st = settings();
+      if (s && s.supported && !s.registered && st.shellMenu !== false && st.menu11Hint !== app.getVersion()) {
+        saveSettings({ menu11Hint: app.getVersion() });
+        menu11HintPending = true;
+        flushMenu11Hint();
+      }
+    }).catch(() => {});
   }
 }
 
@@ -134,6 +148,7 @@ function saveSettings(patch) {
 ipcMain.handle('ready', () => {
   rendererReady = true;
   setTimeout(flush, 0);
+  setTimeout(flushMenu11Hint, 0);
   return { version: app.getVersion(), packaged: app.isPackaged };
 });
 
@@ -320,6 +335,8 @@ ipcMain.handle('menu11-set', async (_e, on, admin) => {
   if (!on) return shellmenu.disable();
   return admin ? shellmenu.enableWithAdmin(app) : shellmenu.enable(app);
 });
+
+ipcMain.handle('menu11-restart-explorer', () => shellmenu.restartExplorer());
 
 ipcMain.handle('ctx-status', () => registry.isRegistered(app.isPackaged ? process.execPath : null));
 ipcMain.handle('ctx-set', async (_e, on) => {

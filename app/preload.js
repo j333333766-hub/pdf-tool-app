@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('api', {
   ctxSet: call('ctx-set'),
   menu11Status: call('menu11-status'),
   menu11Set: call('menu11-set'),
+  menu11RestartExplorer: call('menu11-restart-explorer'),
+  onMenu11Hint: (cb) => ipcRenderer.on('menu11-hint', () => cb()),
   hwpConvert: call('hwp-convert'),
   hwpCancel: call('hwp-cancel'),
   pickHwps: call('pick-hwps'),

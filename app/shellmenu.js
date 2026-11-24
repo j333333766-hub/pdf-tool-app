@@ -1,6 +1,5 @@
 // 윈도우 11 우클릭 첫 화면 메뉴 — 외부 위치(sparse) 패키지를 등록한다 (resources/shellmenu, 원본은 build/shellmenu)
-//   1) 서명한 msix로 설치 — 이 PC가 서명 인증서를 믿을 때(처음 한 번 관리자 권한으로 인증서 등록)
-//   2) 안 되면 개발자 모드일 때 매니페스트를 바로 등록(서명 불필요)
+//   순서는 register.ps1 참고 (서명 msix → 개발자 모드 등록 → 관리자 권한으로 인증서 등록 후 서명 msix)
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -29,6 +28,7 @@ function paths(app) {
     manifest: path.join(res, 'AppxManifest.xml'),
     msix: path.join(res, 'PdfToolShellMenu.msix'),
     cer: path.join(res, 'pdftool-shellmenu.cer'),
+    script: path.join(res, 'register.ps1'),
   };
 }
 const wantVersion = (app) => `${app.getVersion()}.0`;
@@ -40,33 +40,35 @@ async function status(app) {
   return { supported: true, registered: !!version, current: version === wantVersion(app), version, kind };
 }
 
-async function devMode() {
-  const r = await ps(`(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock' -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense`);
-  return r.out === '1';
+// 등록은 resources/shellmenu/register.ps1이 한다(설치 프로그램과 같은 순서: 서명 msix → 개발자 모드 → 관리자 권한으로 인증서 등록)
+//   끝 코드 0 등록 / 3 관리자 권한 필요(또는 거절) / 4 그 밖의 실패
+function runRegister(app, elevate) {
+  const p = paths(app);
+  const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', p.script, '-InstallDir', p.installDir, '-Force'];
+  if (elevate) args.push('-Elevate');
+  return new Promise((resolve) => {
+    execFile('powershell.exe', args, { windowsHide: true, timeout: 180000 }, (err, _stdout, stderr) => {
+      const code = err ? (typeof err.code === 'number' ? err.code : 4) : 0;
+      resolve({ code, err: (stderr || (err && err.message) || '').trim() });
+    });
+  });
 }
 
 // 결과: { ok } 또는 { ok:false, needAdmin:true } / { ok:false, error }
-async function enable(app) {
+async function enable(app, elevate = false) {
   if (!supported()) return { ok: false, error: '윈도우 11에서만 쓸 수 있습니다.' };
-  const p = paths(app);
-  const signed = await ps(`Add-AppxPackage -Path ${q(p.msix)} -ExternalLocation ${q(p.installDir)} -ForceUpdateFromAnyVersion`);
-  if (signed.ok) return { ok: true };
-  if (await devMode()) {
-    const loose = await ps(`Add-AppxPackage -Register ${q(p.manifest)} -ExternalLocation ${q(p.installDir)} -ForceUpdateFromAnyVersion`);
-    if (loose.ok) return { ok: true };
-    return { ok: false, error: loose.err.split(/\r?\n/)[0] };
-  }
-  // 0x800B0109 등: 인증서를 믿지 않음 → 관리자 권한으로 인증서를 한 번 등록해야 한다
-  return { ok: false, needAdmin: true, error: signed.err.split(/\r?\n/)[0] };
+  const r = await runRegister(app, elevate);
+  if (r.code === 0) return { ok: true, restartExplorer: true };
+  if (r.code === 3) return { ok: false, needAdmin: true, error: elevate ? '관리자 권한을 받지 못했습니다.' : '' };
+  return { ok: false, error: r.err.split(/\r?\n/)[0] || `등록 실패(${r.code})` };
 }
 
 // 관리자 권한 창(UAC)을 띄워 서명 인증서를 '신뢰할 수 있는 사람'에 넣고 다시 설치
-async function enableWithAdmin(app) {
-  const p = paths(app);
-  const inner = `Import-Certificate -FilePath ${q(p.cer)} -CertStoreLocation Cert:\\LocalMachine\\TrustedPeople | Out-Null`;
-  const r = await ps(`Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-Command',${q(inner)}`);
-  if (!r.ok) return { ok: false, error: '관리자 권한을 받지 못했습니다.' };
-  return enable(app);
+const enableWithAdmin = (app) => enable(app, true);
+
+// 탐색기를 다시 시작해야 첫 화면 메뉴가 바뀐다 (열린 폴더 창은 닫힘)
+function restartExplorer() {
+  return ps('Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3; if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }');
 }
 
 async function disable() {
@@ -83,4 +85,4 @@ async function sync(app, wanted) {
   return status(app);
 }
 
-module.exports = { supported, status, enable, enableWithAdmin, disable, sync };
+module.exports = { supported, status, enable, enableWithAdmin, disable, sync, restartExplorer };

@@ -1,7 +1,7 @@
 {
   "name": "pdf-tool",
   "productName": "PDF 도구",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "PDF 보기·합치기·나누기·서명·쪽 편집·글자·그림 편집·용량 줄이기·그림 변환, 한글 문서 변환",
   "main": "app/main.js",
   "author": "j333333766",
@@ -87,6 +87,7 @@
           "PdfToolShell.dll",
           "PdfToolShellMenu.msix",
           "pdftool-shellmenu.cer",
+          "register.ps1",
           "Assets/**"
         ]
       }
